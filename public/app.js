@@ -867,59 +867,33 @@ function getMoonPhase(phase) {
     }
 }
 
-function getMoonIllumination(phase) {
-    // Illumination percentage based on phase
-    // New moon = 0%, Full moon = 100%
-    if (phase <= 0.5) {
-        // Waxing: 0% to 100%
-        return Math.round(phase * 200);
-    } else {
-        // Waning: 100% to 0%
-        return Math.round((1 - phase) * 200);
-    }
+function getMoonIllumination(date) {
+    // Use SunCalc to get accurate moon illumination
+    // Returns illuminated fraction (0 to 1), convert to percentage
+    const moonIllumination = SunCalc.getMoonIllumination(date);
+    return Math.round(moonIllumination.fraction * 100);
 }
 
-function calculateMoonDistance(date) {
-    // Moon distance varies between ~225,623 miles (perigee) and ~251,968 miles (apogee)
-    // Average is ~238,900 miles
-    // Simplified calculation based on date (rough approximation)
-    const daysSinceEpoch = (date - new Date('2000-01-01')) / (1000 * 60 * 60 * 24);
-    const anomaly = (daysSinceEpoch * 360 / 27.5545) % 360; // Anomalistic month
-    const distanceVariation = Math.cos(anomaly * Math.PI / 180) * 13172.5; // Half the range
-    return Math.round(238900 + distanceVariation);
+function calculateMoonDistance(date, lat, lon) {
+    // Use SunCalc to get accurate moon distance
+    // Distance is returned in kilometers, convert to miles
+    const moonPosition = SunCalc.getMoonPosition(date, lat, lon);
+    // Distance is in kilometers, convert to miles (1 km = 0.621371 miles)
+    const distanceInMiles = moonPosition.distance * 0.621371;
+    return Math.round(distanceInMiles);
 }
 
 function calculateMoonRiseSet(date, lat, lon) {
-    // Simplified moonrise/moonset calculation
-    // This is a rough approximation - for more accuracy, use a proper astronomical library
-    const moonPhase = calculateMoonPhase(date);
-    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+    // Use SunCalc to get accurate moonrise/moonset times
+    const moonTimes = SunCalc.getMoonTimes(date, lat, lon);
     
-    // Approximate moonrise/moonset based on phase and location
-    // Moon rises about 50 minutes later each day
-    const baseOffset = (dayOfYear * 50) % 1440; // Minutes in a day
-    const phaseOffset = moonPhase * 1440; // Phase affects timing
-    
-    // Latitude affects timing
-    const latOffset = lat * 4; // Rough approximation
-    
-    const riseMinutes = (baseOffset + phaseOffset - latOffset) % 1440;
-    const setMinutes = (riseMinutes + 720) % 1440; // Moon is up ~12 hours
-    
-    const riseTime = new Date(date);
-    riseTime.setHours(0, 0, 0, 0);
-    riseTime.setMinutes(riseTime.getMinutes() + riseMinutes);
-    
-    const setTime = new Date(date);
-    setTime.setHours(0, 0, 0, 0);
-    setTime.setMinutes(setTime.getMinutes() + setMinutes);
-    
-    // If set time is before rise time, it's the next day
-    if (setTime < riseTime) {
-        setTime.setDate(setTime.getDate() + 1);
-    }
-    
-    return { rise: riseTime, set: setTime };
+    // SunCalc returns Date objects or null if moon doesn't rise/set that day
+    return {
+        rise: moonTimes.rise || null,
+        set: moonTimes.set || null,
+        alwaysUp: moonTimes.alwaysUp || false,
+        alwaysDown: moonTimes.alwaysDown || false
+    };
 }
 
 function getNextFullMoon(date) {
@@ -960,13 +934,17 @@ function openMoonDetailsModal(date) {
     const modal = document.getElementById('moonDetailsModal');
     modal.classList.add('active');
     
+    // Use current location or default to a location if not available
+    const lat = currentLat || 40.7128; // Default to NYC if location not available
+    const lon = currentLon || -74.0060;
+    
     const moonPhaseValue = calculateMoonPhase(date);
     const moonPhase = getMoonPhase(moonPhaseValue);
-    const illumination = getMoonIllumination(moonPhaseValue);
-    const distance = calculateMoonDistance(date);
+    const illumination = getMoonIllumination(date);
+    const distance = calculateMoonDistance(date, lat, lon);
     
-    // Get moonrise/moonset
-    const riseSet = calculateMoonRiseSet(date, currentLat || 0, currentLon || 0);
+    // Get moonrise/moonset using SunCalc
+    const riseSet = calculateMoonRiseSet(date, lat, lon);
     
     // Get next full/new moon
     const nextFull = getNextFullMoon(date);
@@ -982,8 +960,28 @@ function openMoonDetailsModal(date) {
         day: 'numeric' 
     });
     document.getElementById('moonIllumination').textContent = `${illumination}%`;
-    document.getElementById('moonRise').textContent = formatTime12Hour(riseSet.rise);
-    document.getElementById('moonSet').textContent = formatTime12Hour(riseSet.set);
+    
+    // Handle moonrise/moonset display (may be null if moon doesn't rise/set that day)
+    if (riseSet.alwaysUp) {
+        document.getElementById('moonRise').textContent = 'Always up';
+    } else if (riseSet.alwaysDown) {
+        document.getElementById('moonRise').textContent = 'Always down';
+    } else if (riseSet.rise) {
+        document.getElementById('moonRise').textContent = formatTime12Hour(riseSet.rise);
+    } else {
+        document.getElementById('moonRise').textContent = 'N/A';
+    }
+    
+    if (riseSet.alwaysUp) {
+        document.getElementById('moonSet').textContent = 'Always up';
+    } else if (riseSet.alwaysDown) {
+        document.getElementById('moonSet').textContent = 'Always down';
+    } else if (riseSet.set) {
+        document.getElementById('moonSet').textContent = formatTime12Hour(riseSet.set);
+    } else {
+        document.getElementById('moonSet').textContent = 'N/A';
+    }
+    
     document.getElementById('moonDistance').textContent = `${distance.toLocaleString()} mi`;
     document.getElementById('nextFullMoon').textContent = `${nextFull.days} days (${nextFull.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
     document.getElementById('nextNewMoon').textContent = `${nextNew.days} days (${nextNew.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;

@@ -6,10 +6,11 @@ A fully featured, modern weather website built as a Cloudflare Worker. Jaccuweat
 
 ### Core Weather Features
 - 🌤️ **Current Weather Display** - Real-time temperature, conditions, humidity, wind speed, UV index, and "feels like" temperature
-- 📅 **7-Day Forecast** - Extended weather forecast with daily highs, lows, precipitation totals, snowfall, wind speeds, and sunrise/sunset times
+- 📅 **14-Day Forecast** - Extended weather forecast with daily highs, lows, precipitation totals, snowfall, wind speeds, sunrise/sunset times, and moon phases
 - ⏰ **24-Hour Forecast** - Detailed hourly weather predictions with interactive charts showing temperature, precipitation probability, and conditions
 - ❄️ **Weekly Snow Totals** - Displays cumulative snowfall predictions for the week when snow is in the forecast
-- 📊 **Interactive Charts** - Visual temperature and precipitation charts for hourly forecasts
+- 🌙 **Moon Phase Data** - Comprehensive moon phase information including illumination, moonrise/moonset times, distance, and next full/new moon dates
+- 📊 **Interactive Charts** - Visual temperature, precipitation, wind, and moon phase charts for extended forecasts
 
 ### Location Features
 - 🔍 **Location Search** - Search for any city or location worldwide with autocomplete
@@ -43,6 +44,7 @@ A fully featured, modern weather website built as a Cloudflare Worker. Jaccuweat
 - **Tailwind CSS** - Utility-first CSS framework for styling
 - **Font Awesome** - Icon library for UI elements
 - **Chart.js** - Interactive charts for weather data visualization
+- **SunCalc.js** - Accurate astronomical calculations for moon phases, moonrise/moonset times, and moon distance
 
 ### Backend & Infrastructure
 - **Cloudflare Workers** - Serverless deployment platform for edge computing
@@ -154,13 +156,14 @@ The Cloudflare Worker provides the following endpoints:
 - **Modal View**: Click header to open expanded modal with full details
 
 ### Daily Forecast
-- **7-Day Extended Forecast**: Complete week-long weather predictions
+- **14-Day Extended Forecast**: Complete two-week weather predictions
 - **Daily Highs/Lows**: Maximum and minimum temperatures
 - **Precipitation**: Daily precipitation totals and probability
 - **Snowfall**: Daily snowfall accumulation
 - **Wind**: Maximum wind speeds
 - **Sunrise/Sunset**: Daily sunrise and sunset times
-- **Modal View**: Click header to open expanded modal with full details
+- **Moon Phases**: Moon phase emoji and name for each day
+- **Modal View**: Click header to open expanded modal with full details, charts, and moon phase information
 
 ### Weekly Snow Totals
 - **Automatic Display**: Only appears when snow is in the forecast
@@ -173,10 +176,20 @@ The Cloudflare Worker provides the following endpoints:
 - **Local Storage**: Favorites persist across browser sessions
 - **Remove Favorites**: Easy removal of saved locations
 
+### Moon Phase Features
+- **Current Moon Phase**: Displays today's moon phase with emoji and name in the current weather section
+- **14-Day Moon Phases**: Moon phase information for each day in the extended forecast
+- **Moon Details Modal**: Click any moon phase tile to see detailed information including:
+  - Moon illumination percentage
+  - Accurate moonrise and moonset times (calculated using SunCalc.js)
+  - Moon distance in miles (varies with lunar cycle)
+  - Days until next full moon and new moon
+- **Moon Phase Chart**: Visual chart showing moon phase progression over 14 days in the expanded forecast modal
+
 ### Weather Radar
 - **Ventusky Integration**: Embedded Ventusky precipitation map
 - **Auto-Centering**: Automatically centers on current or searched location
-- **Responsive Sizing**: Optimized aspect ratios for desktop and mobile
+- **Responsive Sizing**: Optimized aspect ratios for desktop and mobile (more zoomed out on mobile)
 - **Interactive Controls**: Full Ventusky map controls (zoom, pan, layer switching)
 - **Safe Scrolling**: Prevents accidental navigation when scrolling past the radar
 
@@ -316,6 +329,7 @@ MIT License - feel free to use this project for personal or commercial purposes.
 
 - **Weather Data**: [Open-Meteo](https://open-meteo.com/) - Free, open-source weather API
 - **Weather Maps**: [Ventusky](https://www.ventusky.com/) - Interactive weather visualization
+- **Moon Calculations**: [SunCalc.js](https://github.com/mourner/suncalc) - Accurate astronomical calculations for moon phases and times
 - **Icons**: [Font Awesome](https://fontawesome.com/) - Icon library
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
 - **Charts**: [Chart.js](https://www.chartjs.org/) - JavaScript charting library
