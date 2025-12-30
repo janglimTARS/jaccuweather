@@ -449,7 +449,7 @@ async function fetchWeather(lat, lon) {
 
     try {
         // Make direct request to Open-Meteo from browser (uses user's IP, not shared Cloudflare IP)
-        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
 
         // Check for rate limiting before parsing JSON
         if (weatherResponse.status === 429) {
@@ -578,6 +578,20 @@ function displayWeather(data) {
         const sunsetTime = new Date(data.daily.sunset[0]);
         document.getElementById('sunset').textContent = formatTime12Hour(sunsetTime);
     }
+    
+    // Moon phase (for today)
+    const today = new Date();
+    const moonPhaseValue = calculateMoonPhase(today);
+    const moonPhase = getMoonPhase(moonPhaseValue);
+    document.getElementById('moonPhaseEmoji').textContent = moonPhase.emoji;
+    document.getElementById('moonPhaseName').textContent = moonPhase.name;
+    
+    // Make moon phase card clickable
+    const moonPhaseCard = document.getElementById('moonPhase');
+    if (moonPhaseCard) {
+        moonPhaseCard.style.cursor = 'pointer';
+        moonPhaseCard.addEventListener('click', () => openMoonDetailsModal(today));
+    }
 
     // Hourly forecast
     const hourlyContainer = document.getElementById('hourlyForecast').querySelector('.flex');
@@ -614,7 +628,11 @@ function displayWeather(data) {
     const dailyContainer = document.getElementById('dailyForecast');
     dailyContainer.innerHTML = '';
     
-    for (let i = 0; i < Math.min(7, data.daily.time.length); i++) {
+    // Check if mobile to use abbreviated day names
+    const isMobile = window.innerWidth <= 768;
+    const weekdayFormat = isMobile ? 'short' : 'long';
+    
+    for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
         const day = parseDateString(data.daily.time[i]);
         const dayItem = document.createElement('div');
         dayItem.className = 'flex items-center justify-between bg-white/10 rounded-lg p-4 backdrop-blur-sm clickable';
@@ -622,7 +640,7 @@ function displayWeather(data) {
             <div class="flex items-center gap-4">
                 <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[i])}</div>
                 <div>
-                    <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: 'long' })}</div>
+                    <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
                     <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                 </div>
             </div>
@@ -638,6 +656,7 @@ function displayWeather(data) {
                 </div>
             </div>
         `;
+        
         dayItem.addEventListener('click', () => openDailyModal(data));
         dailyContainer.appendChild(dayItem);
     }
@@ -667,11 +686,15 @@ function displayWeeklySnowTotals(data) {
     
     // Collect all days with snow
     const snowDays = [];
-    for (let i = 0; i < Math.min(7, data.daily.time.length); i++) {
+    // Check if mobile to use abbreviated day names
+    const isMobile = window.innerWidth <= 768;
+    const weekdayFormat = isMobile ? 'short' : 'long';
+    
+    for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
         const snowfall = data.daily.snowfall_sum[i] || 0;
         if (snowfall > 0) {
             const day = parseDateString(data.daily.time[i]);
-            const dayName = day.toLocaleDateString('en-US', { weekday: 'long' });
+            const dayName = day.toLocaleDateString('en-US', { weekday: weekdayFormat });
             const dateStr = day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             // Round to nearest 0.1 inch
             const roundedSnow = Math.round(snowfall * 10) / 10;
@@ -805,6 +828,165 @@ function getWeatherDescription(code) {
         95: 'Thunderstorm', 96: 'Thunderstorm with slight hail', 99: 'Thunderstorm with heavy hail'
     };
     return descriptions[code] || 'Unknown';
+}
+
+function calculateMoonPhase(date) {
+    // Calculate days since known new moon (January 6, 2000 18:14 UTC)
+    const knownNewMoon = new Date('2000-01-06T18:14:00Z');
+    const daysSinceNewMoon = (date - knownNewMoon) / (1000 * 60 * 60 * 24);
+    
+    // Moon cycle is approximately 29.53058867 days
+    const moonCycle = 29.53058867;
+    const phase = (daysSinceNewMoon % moonCycle) / moonCycle;
+    
+    // Ensure phase is between 0 and 1
+    return phase < 0 ? phase + 1 : phase;
+}
+
+function getMoonPhase(phase) {
+    // Moon phase is a value from 0 to 1
+    // 0 = New Moon, 0.25 = First Quarter, 0.5 = Full Moon, 0.75 = Last Quarter
+    if (phase === null || phase === undefined) return { emoji: '🌑', name: 'Unknown' };
+    
+    if (phase < 0.03 || phase >= 0.97) {
+        return { emoji: '🌑', name: 'New Moon' };
+    } else if (phase >= 0.03 && phase < 0.22) {
+        return { emoji: '🌒', name: 'Waxing Crescent' };
+    } else if (phase >= 0.22 && phase < 0.28) {
+        return { emoji: '🌓', name: 'First Quarter' };
+    } else if (phase >= 0.28 && phase < 0.47) {
+        return { emoji: '🌔', name: 'Waxing Gibbous' };
+    } else if (phase >= 0.47 && phase < 0.53) {
+        return { emoji: '🌕', name: 'Full Moon' };
+    } else if (phase >= 0.53 && phase < 0.72) {
+        return { emoji: '🌖', name: 'Waning Gibbous' };
+    } else if (phase >= 0.72 && phase < 0.78) {
+        return { emoji: '🌗', name: 'Last Quarter' };
+    } else {
+        return { emoji: '🌘', name: 'Waning Crescent' };
+    }
+}
+
+function getMoonIllumination(phase) {
+    // Illumination percentage based on phase
+    // New moon = 0%, Full moon = 100%
+    if (phase <= 0.5) {
+        // Waxing: 0% to 100%
+        return Math.round(phase * 200);
+    } else {
+        // Waning: 100% to 0%
+        return Math.round((1 - phase) * 200);
+    }
+}
+
+function calculateMoonDistance(date) {
+    // Moon distance varies between ~225,623 miles (perigee) and ~251,968 miles (apogee)
+    // Average is ~238,900 miles
+    // Simplified calculation based on date (rough approximation)
+    const daysSinceEpoch = (date - new Date('2000-01-01')) / (1000 * 60 * 60 * 24);
+    const anomaly = (daysSinceEpoch * 360 / 27.5545) % 360; // Anomalistic month
+    const distanceVariation = Math.cos(anomaly * Math.PI / 180) * 13172.5; // Half the range
+    return Math.round(238900 + distanceVariation);
+}
+
+function calculateMoonRiseSet(date, lat, lon) {
+    // Simplified moonrise/moonset calculation
+    // This is a rough approximation - for more accuracy, use a proper astronomical library
+    const moonPhase = calculateMoonPhase(date);
+    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+    
+    // Approximate moonrise/moonset based on phase and location
+    // Moon rises about 50 minutes later each day
+    const baseOffset = (dayOfYear * 50) % 1440; // Minutes in a day
+    const phaseOffset = moonPhase * 1440; // Phase affects timing
+    
+    // Latitude affects timing
+    const latOffset = lat * 4; // Rough approximation
+    
+    const riseMinutes = (baseOffset + phaseOffset - latOffset) % 1440;
+    const setMinutes = (riseMinutes + 720) % 1440; // Moon is up ~12 hours
+    
+    const riseTime = new Date(date);
+    riseTime.setHours(0, 0, 0, 0);
+    riseTime.setMinutes(riseTime.getMinutes() + riseMinutes);
+    
+    const setTime = new Date(date);
+    setTime.setHours(0, 0, 0, 0);
+    setTime.setMinutes(setTime.getMinutes() + setMinutes);
+    
+    // If set time is before rise time, it's the next day
+    if (setTime < riseTime) {
+        setTime.setDate(setTime.getDate() + 1);
+    }
+    
+    return { rise: riseTime, set: setTime };
+}
+
+function getNextFullMoon(date) {
+    const currentPhase = calculateMoonPhase(date);
+    let daysToFull = 0;
+    
+    if (currentPhase < 0.5) {
+        // Before full moon
+        daysToFull = (0.5 - currentPhase) * 29.53058867;
+    } else {
+        // After full moon, next one is in next cycle
+        daysToFull = (1.5 - currentPhase) * 29.53058867;
+    }
+    
+    const nextFullMoon = new Date(date);
+    nextFullMoon.setDate(nextFullMoon.getDate() + Math.round(daysToFull));
+    return { date: nextFullMoon, days: Math.round(daysToFull) };
+}
+
+function getNextNewMoon(date) {
+    const currentPhase = calculateMoonPhase(date);
+    let daysToNew = 0;
+    
+    if (currentPhase < 0.97) {
+        // Before new moon
+        daysToNew = (1 - currentPhase) * 29.53058867;
+    } else {
+        // Very close to new moon, next one is in next cycle
+        daysToNew = (1 - currentPhase + 1) * 29.53058867;
+    }
+    
+    const nextNewMoon = new Date(date);
+    nextNewMoon.setDate(nextNewMoon.getDate() + Math.round(daysToNew));
+    return { date: nextNewMoon, days: Math.round(daysToNew) };
+}
+
+function openMoonDetailsModal(date) {
+    const modal = document.getElementById('moonDetailsModal');
+    modal.classList.add('active');
+    
+    const moonPhaseValue = calculateMoonPhase(date);
+    const moonPhase = getMoonPhase(moonPhaseValue);
+    const illumination = getMoonIllumination(moonPhaseValue);
+    const distance = calculateMoonDistance(date);
+    
+    // Get moonrise/moonset
+    const riseSet = calculateMoonRiseSet(date, currentLat || 0, currentLon || 0);
+    
+    // Get next full/new moon
+    const nextFull = getNextFullMoon(date);
+    const nextNew = getNextNewMoon(date);
+    
+    // Populate modal
+    document.getElementById('moonDetailsEmoji').textContent = moonPhase.emoji;
+    document.getElementById('moonDetailsName').textContent = moonPhase.name;
+    document.getElementById('moonDetailsDate').textContent = date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    document.getElementById('moonIllumination').textContent = `${illumination}%`;
+    document.getElementById('moonRise').textContent = formatTime12Hour(riseSet.rise);
+    document.getElementById('moonSet').textContent = formatTime12Hour(riseSet.set);
+    document.getElementById('moonDistance').textContent = `${distance.toLocaleString()} mi`;
+    document.getElementById('nextFullMoon').textContent = `${nextFull.days} days (${nextFull.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+    document.getElementById('nextNewMoon').textContent = `${nextNew.days} days (${nextNew.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
 }
 
 function formatTime12Hour(date) {
@@ -1273,8 +1455,9 @@ function openDailyModal(data) {
     const snowfall = [];
     const wind = [];
     const precipProb = [];
+    const moonPhases = [];
     
-    for (let i = 0; i < Math.min(7, data.daily.time.length); i++) {
+    for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
         const day = parseDateString(data.daily.time[i]);
         labels.push(day.toLocaleDateString('en-US', { weekday: 'short' }));
         maxTemps.push(Math.round(data.daily.temperature_2m_max[i]));
@@ -1283,6 +1466,7 @@ function openDailyModal(data) {
         snowfall.push(data.daily.snowfall_sum ? data.daily.snowfall_sum[i] || 0 : 0);
         wind.push(data.daily.wind_speed_10m_max[i]);
         precipProb.push(data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[i] : 0);
+        moonPhases.push(calculateMoonPhase(day));
     }
     
     // Create charts
@@ -1365,6 +1549,50 @@ function openDailyModal(data) {
                     fill: true
                 }]
             }
+        }),
+        moonPhase: new Chart(document.getElementById('dailyMoonPhaseChart'), {
+            ...chartConfig,
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Moon Phase',
+                    data: moonPhases,
+                    borderColor: 'rgb(147, 112, 219)',
+                    backgroundColor: 'rgba(147, 112, 219, 0.2)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                ...chartConfig.options,
+                scales: {
+                    ...chartConfig.options.scales,
+                    y: {
+                        ...chartConfig.options.scales.y,
+                        min: 0,
+                        max: 1,
+                        ticks: {
+                            ...chartConfig.options.scales.y.ticks,
+                            stepSize: 0.125,
+                            callback: function(value) {
+                                const phase = getMoonPhase(value);
+                                return phase.emoji;
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    ...chartConfig.options.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const phase = getMoonPhase(context.parsed.y);
+                                return `Moon Phase: ${phase.emoji} ${phase.name} (${(context.parsed.y * 100).toFixed(1)}%)`;
+                            }
+                        }
+                    }
+                }
+            }
         })
     };
     
@@ -1384,8 +1612,10 @@ function openDailyModal(data) {
     // Populate detailed daily items
     const detailsContainer = document.getElementById('dailyDetails');
     detailsContainer.innerHTML = '';
-    for (let i = 0; i < Math.min(7, data.daily.time.length); i++) {
+    for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
         const day = parseDateString(data.daily.time[i]);
+        const moonPhaseValue = calculateMoonPhase(day);
+        const moonPhase = getMoonPhase(moonPhaseValue);
         const detailItem = document.createElement('div');
         detailItem.className = 'bg-white/10 rounded-lg p-4 backdrop-blur-sm';
         detailItem.innerHTML = `
@@ -1396,7 +1626,7 @@ function openDailyModal(data) {
                 </div>
                 <div class="text-4xl">${getWeatherIcon(data.daily.weather_code[i])}</div>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 <div class="bg-white/10 rounded p-3">
                     <div class="text-white/70 text-xs mb-1">High / Low</div>
                     <div class="text-white font-bold">${Math.round(maxTemps[i])}${data.daily_units.temperature_2m_max} / ${Math.round(minTemps[i])}${data.daily_units.temperature_2m_min}</div>
@@ -1422,9 +1652,26 @@ function openDailyModal(data) {
                     <div class="text-white font-bold">${precipProb[i]}%</div>
                 </div>
                 ` : '')}
+                <div class="bg-white/10 rounded p-3 moon-phase-clickable" style="cursor: pointer;">
+                    <div class="text-white/70 text-xs mb-1"><i class="fas fa-moon mr-1"></i>Moon Phase</div>
+                    <div class="text-white font-bold flex items-center gap-2">
+                        <span class="text-xl">${moonPhase.emoji}</span>
+                        <span class="text-sm">${moonPhase.name}</span>
+                    </div>
+                </div>
             </div>
             <div class="mt-3 text-white/80">${getWeatherDescription(data.daily.weather_code[i])}</div>
         `;
+        
+        // Add click handler for moon phase card in modal
+        const moonPhaseCard = detailItem.querySelector('.moon-phase-clickable');
+        if (moonPhaseCard) {
+            moonPhaseCard.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openMoonDetailsModal(day);
+            });
+        }
+        
         detailsContainer.appendChild(detailItem);
     }
 }
@@ -1436,6 +1683,10 @@ document.getElementById('closeHourlyModal').addEventListener('click', () => {
 
 document.getElementById('closeDailyModal').addEventListener('click', () => {
     document.getElementById('dailyModal').classList.remove('active');
+});
+
+document.getElementById('closeMoonDetailsModal').addEventListener('click', () => {
+    document.getElementById('moonDetailsModal').classList.remove('active');
 });
 
 // Close modals when clicking outside
@@ -1451,11 +1702,18 @@ document.getElementById('dailyModal').addEventListener('click', (e) => {
     }
 });
 
+document.getElementById('moonDetailsModal').addEventListener('click', (e) => {
+    if (e.target.id === 'moonDetailsModal') {
+        document.getElementById('moonDetailsModal').classList.remove('active');
+    }
+});
+
 // Close modals with Escape key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         document.getElementById('hourlyModal').classList.remove('active');
         document.getElementById('dailyModal').classList.remove('active');
+        document.getElementById('moonDetailsModal').classList.remove('active');
     }
 });
 
@@ -1465,9 +1723,9 @@ function initializeVentuskyRadar(lat, lon) {
     // Format: https://www.ventusky.com/precipitation-map?p=[lat];[lon];[zoom]&l=[layer]
     // Using precipitation map as default - users can change layers within Ventusky
     // Zoom level 8 shows approximately 50 miles x 50 miles
-    // Use slightly higher zoom on mobile to show less area but more detail
+    // Use slightly lower zoom on mobile to show more area (zoomed out by one level)
     const isMobile = window.innerWidth <= 768;
-    const zoom = isMobile ? 9 : 8; // Higher zoom on mobile for better detail
+    const zoom = isMobile ? 7 : 8; // Lower zoom on mobile (more zoomed out)
     // Use proxy route to request desktop version (removes download app button)
     const ventuskyUrl = `/ventusky-proxy/precipitation-map?p=${lat};${lon};${zoom}&l=rain`;
     
@@ -1542,9 +1800,9 @@ function initializeVentuskyRadar(lat, lon) {
 function updateVentuskyLocation(lat, lon) {
     // Update iframe URL when location changes
     // Zoom level 8 shows approximately 50 miles x 50 miles on desktop
-    // Use slightly higher zoom on mobile to show less area but more detail
+    // Use slightly lower zoom on mobile to show more area (zoomed out by one level)
     const isMobile = window.innerWidth <= 768;
-    const zoom = isMobile ? 9 : 8;
+    const zoom = isMobile ? 7 : 8; // Lower zoom on mobile (more zoomed out)
     // Use proxy route to request desktop version (removes download app button)
     const ventuskyUrl = `/ventusky-proxy/precipitation-map?p=${lat};${lon};${zoom}&l=rain`;
     
