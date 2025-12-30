@@ -1,108 +1,330 @@
-# Weather App - Cloudflare Worker
+# Jaccuweather
 
-A fully featured weather website built as a Cloudflare Worker, using the Open-Meteo API for weather data and Tailwind CSS for styling.
+A fully featured, modern weather website built as a Cloudflare Worker. Jaccuweather provides real-time weather forecasts, interactive radar maps, and detailed meteorological data using the Open-Meteo API and Ventusky for radar visualization.
 
-## Features
+## 🌟 Features
 
-- 🌤️ **Current Weather Display** - Shows current temperature, conditions, humidity, wind speed, and UV index
-- 📅 **7-Day Forecast** - Extended weather forecast with daily highs, lows, precipitation, and wind
-- ⏰ **24-Hour Forecast** - Hourly weather predictions for the next 24 hours
-- 🔍 **Location Search** - Search for any city or location worldwide
+### Core Weather Features
+- 🌤️ **Current Weather Display** - Real-time temperature, conditions, humidity, wind speed, UV index, and "feels like" temperature
+- 📅 **7-Day Forecast** - Extended weather forecast with daily highs, lows, precipitation totals, snowfall, wind speeds, and sunrise/sunset times
+- ⏰ **24-Hour Forecast** - Detailed hourly weather predictions with interactive charts showing temperature, precipitation probability, and conditions
+- ❄️ **Weekly Snow Totals** - Displays cumulative snowfall predictions for the week when snow is in the forecast
+- 📊 **Interactive Charts** - Visual temperature and precipitation charts for hourly forecasts
+
+### Location Features
+- 🔍 **Location Search** - Search for any city or location worldwide with autocomplete
 - 📍 **Geolocation** - Automatically detects and displays weather for your current location
+- ⭐ **Favorites System** - Save and quickly access your favorite locations
+- 🔄 **Reverse Geocoding** - Automatically displays location names for coordinates
+
+### Radar & Maps
+- 🗺️ **Interactive Weather Radar** - Embedded Ventusky precipitation map with real-time weather visualization
+- 📍 **Location-Based Radar** - Radar automatically centers on your current or searched location
+- 🎯 **Responsive Design** - Optimized radar view for both desktop and mobile devices
+- 🔒 **Safe Browsing** - Prevents accidental navigation when scrolling past the radar
+
+### User Experience
 - 🎨 **Modern UI** - Beautiful gradient design with glassmorphism effects using Tailwind CSS
+- 📱 **Fully Responsive** - Optimized for desktop, tablet, and mobile devices
 - ⚡ **Fast & Lightweight** - Deployed on Cloudflare's edge network for global performance
+- 🌙 **Dark Theme** - Easy-on-the-eyes dark color scheme
+- 📱 **PWA Ready** - Apple touch icons and mobile web app support
 
-## Tech Stack
+### Technical Features
+- 🔄 **API Proxy** - Cloudflare Worker proxies API requests to avoid CORS issues
+- 🛡️ **Error Handling** - Comprehensive error handling with user-friendly messages
+- 💾 **Local Storage** - Favorites and preferences saved locally
+- 🚫 **Rate Limit Handling** - Graceful handling of API rate limits
 
-- **Cloudflare Workers** - Serverless deployment platform
-- **Open-Meteo API** - Free, open-source weather API
-- **Tailwind CSS** - Utility-first CSS framework
-- **Font Awesome** - Icon library
-- **Vanilla JavaScript** - No framework dependencies
+## 🛠️ Tech Stack
 
-## Setup
+### Frontend
+- **Vanilla JavaScript** - No framework dependencies, pure ES6+
+- **Tailwind CSS** - Utility-first CSS framework for styling
+- **Font Awesome** - Icon library for UI elements
+- **Chart.js** - Interactive charts for weather data visualization
 
-1. **Install dependencies:**
+### Backend & Infrastructure
+- **Cloudflare Workers** - Serverless deployment platform for edge computing
+- **Open-Meteo API** - Free, open-source weather API for forecast data
+- **Ventusky** - Interactive weather maps and radar visualization
+- **BigDataCloud API** - Reverse geocoding service (free tier)
+
+### Development Tools
+- **Wrangler** - Cloudflare Workers CLI for development and deployment
+- **Node.js** - Build tooling and dependencies
+- **Sharp** - Image processing for favicon conversion
+
+## 📦 Installation & Setup
+
+### Prerequisites
+- Node.js (v16 or higher)
+- npm or yarn
+- Cloudflare account (for deployment)
+- Git (for version control)
+
+### Local Development
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/anglim3/jaccuweather.git
+   cd jaccuweather
+   ```
+
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. **Build the project:**
+3. **Build the project:**
    ```bash
    npm run build
    ```
+   This generates the Cloudflare Worker file (`src/index.js`) by embedding HTML, JavaScript, and assets.
 
-3. **Run locally:**
+4. **Run locally:**
    ```bash
    npm run dev
    ```
+   This builds the project and starts a local development server using Wrangler.
 
-4. **Deploy to Cloudflare:**
-   ```bash
-   npm run deploy
-   ```
+### Deployment
 
-   Note: You'll need to authenticate with Cloudflare first:
+1. **Authenticate with Cloudflare:**
    ```bash
    npx wrangler login
    ```
 
-## Project Structure
+2. **Deploy to Cloudflare Workers:**
+   ```bash
+   npm run deploy
+   ```
+   This builds the project and deploys it to Cloudflare's edge network.
+
+## 📁 Project Structure
 
 ```
 Weather/
 ├── public/
-│   ├── index.html    # Main HTML template
-│   └── app.js        # Frontend JavaScript
+│   ├── index.html           # Main HTML template with embedded styles
+│   ├── app.js               # Frontend JavaScript (weather logic, UI interactions)
+│   ├── favicon.svg          # SVG favicon
+│   └── apple-touch-icon.png # iOS home screen icon (auto-generated)
 ├── src/
-│   └── index.js      # Cloudflare Worker (auto-generated)
-├── build.js          # Build script
-├── package.json      # Dependencies and scripts
-├── wrangler.toml     # Cloudflare Worker configuration
-└── README.md         # This file
+│   └── index.js             # Cloudflare Worker (auto-generated by build.js)
+├── build.js                 # Build script that embeds assets into worker
+├── convert-favicon.js       # Converts SVG favicon to PNG for iOS
+├── backup.sh                # Automated backup script for Git
+├── package.json             # Dependencies and npm scripts
+├── wrangler.toml            # Cloudflare Worker configuration
+└── README.md                # This file
 ```
 
-## API Endpoints
+## 🔌 API Endpoints
 
-The worker proxies requests to the Open-Meteo API:
+The Cloudflare Worker provides the following endpoints:
 
-- `/api/forecast` - Weather forecast data
-- `/api/geocoding` - Location search and reverse geocoding
+### Main Routes
+- `/` or `/index.html` - Serves the main HTML page
+- `/app.js` - Serves the JavaScript application
+- `/favicon.svg` - SVG favicon
+- `/apple-touch-icon.png` - iOS touch icon
 
-## Features in Detail
+### Proxy Routes
+- `/api/forecast` - Proxies requests to Open-Meteo forecast API
+- `/api/geocoding` - Proxies requests to Open-Meteo geocoding API
+- `/api/reverse` - Proxies requests to BigDataCloud reverse geocoding API
+- `/ventusky-proxy/*` - Proxies Ventusky requests with desktop user agent to avoid mobile app prompts
 
-### Current Weather
-- Temperature (actual and feels like)
-- Weather condition description
-- Relative humidity
-- Wind speed
-- UV index
+## 📋 Features in Detail
+
+### Current Weather Display
+- **Temperature**: Current temperature in Fahrenheit
+- **Feels Like**: Apparent temperature accounting for wind and humidity
+- **Conditions**: Weather description (sunny, cloudy, rain, etc.)
+- **Humidity**: Relative humidity percentage
+- **Wind Speed**: Current wind speed in mph
+- **UV Index**: Current UV index level
+- **Sunrise/Sunset**: Times for the current day
 
 ### Hourly Forecast
-- Next 24 hours of weather
-- Temperature for each hour
-- Weather conditions
-- Wind speed
+- **24-Hour View**: Detailed forecast for the next 24 hours
+- **Interactive Chart**: Visual temperature graph with Chart.js
+- **Hour-by-Hour Data**: Temperature, conditions, precipitation probability, and wind speed
+- **Modal View**: Click header to open expanded modal with full details
 
 ### Daily Forecast
-- 7-day extended forecast
-- Daily high and low temperatures
-- Precipitation totals
-- Maximum wind speeds
+- **7-Day Extended Forecast**: Complete week-long weather predictions
+- **Daily Highs/Lows**: Maximum and minimum temperatures
+- **Precipitation**: Daily precipitation totals and probability
+- **Snowfall**: Daily snowfall accumulation
+- **Wind**: Maximum wind speeds
+- **Sunrise/Sunset**: Daily sunrise and sunset times
+- **Modal View**: Click header to open expanded modal with full details
 
-## Browser Support
+### Weekly Snow Totals
+- **Automatic Display**: Only appears when snow is in the forecast
+- **Cumulative Totals**: Shows total expected snowfall for the week
+- **Daily Breakdown**: Individual day snowfall amounts
 
-- Modern browsers with ES6+ support
-- Geolocation API support (optional, falls back to default location)
-- Fetch API support
+### Favorites System
+- **Save Locations**: Add current location to favorites
+- **Quick Access**: Dropdown menu for quick location switching
+- **Local Storage**: Favorites persist across browser sessions
+- **Remove Favorites**: Easy removal of saved locations
 
-## License
+### Weather Radar
+- **Ventusky Integration**: Embedded Ventusky precipitation map
+- **Auto-Centering**: Automatically centers on current or searched location
+- **Responsive Sizing**: Optimized aspect ratios for desktop and mobile
+- **Interactive Controls**: Full Ventusky map controls (zoom, pan, layer switching)
+- **Safe Scrolling**: Prevents accidental navigation when scrolling past the radar
 
-MIT
+## 🔧 Development Workflow
 
-## Credits
+### Making Changes
 
-- Weather data provided by [Open-Meteo](https://open-meteo.com/)
-- Icons by [Font Awesome](https://fontawesome.com/)
-- Styling by [Tailwind CSS](https://tailwindcss.com/)
+1. **Edit source files:**
+   - `public/index.html` - HTML structure and styles
+   - `public/app.js` - JavaScript functionality
 
+2. **Test locally:**
+   ```bash
+   npm run dev
+   ```
+   Visit the local URL provided by Wrangler (typically `http://localhost:8787`)
+
+3. **Build for production:**
+   ```bash
+   npm run build
+   ```
+   This creates the optimized worker file.
+
+4. **Deploy:**
+   ```bash
+   npm run deploy
+   ```
+
+### Testing New Changes
+
+Before deploying, always test locally using `npm run dev`. This:
+- Builds the project
+- Starts a local Cloudflare Worker
+- Allows you to test all features without deploying
+- Provides hot-reloading for development
+
+## 💾 Backup & Restore
+
+### Automated Backup
+
+The project includes an automated backup script (`backup.sh`) that:
+- Commits all changes to Git
+- Pushes to the remote repository
+- Can be scheduled with cron for automatic backups
+
+**To use the backup script:**
+```bash
+chmod +x backup.sh
+./backup.sh
+```
+
+**To schedule automatic backups (example - daily at 2 AM):**
+```bash
+crontab -e
+# Add this line:
+0 2 * * * /path/to/Weather/backup.sh
+```
+
+### Manual Backup
+
+1. **Commit changes:**
+   ```bash
+   git add .
+   git commit -m "Your commit message"
+   ```
+
+2. **Push to remote:**
+   ```bash
+   git push origin main
+   ```
+
+### Restore from Backup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/anglim3/jaccuweather.git
+   cd jaccuweather
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Build and deploy:**
+   ```bash
+   npm run build
+   npm run deploy
+   ```
+
+## 🌐 Browser Support
+
+- **Modern Browsers**: Chrome, Firefox, Safari, Edge (latest versions)
+- **Mobile Browsers**: iOS Safari, Chrome Mobile, Firefox Mobile
+- **Required Features**:
+  - ES6+ JavaScript support
+  - Fetch API
+  - Geolocation API (optional, falls back to default location)
+  - Local Storage API
+  - CSS Grid and Flexbox
+
+## 🔒 Security & Privacy
+
+- **No API Keys Required**: Uses free, open APIs that don't require authentication
+- **Client-Side Requests**: Weather API requests made directly from browser (uses user's IP)
+- **Local Storage Only**: Favorites stored locally, never sent to servers
+- **No Tracking**: No analytics or tracking scripts included
+- **CORS Handling**: Cloudflare Worker proxies API requests to avoid CORS issues
+
+## 🐛 Troubleshooting
+
+### Build Errors
+- Ensure Node.js is v16 or higher
+- Delete `node_modules` and run `npm install` again
+- Check that all dependencies are installed
+
+### Deployment Issues
+- Verify Cloudflare authentication: `npx wrangler whoami`
+- Check `wrangler.toml` configuration
+- Ensure you have a Cloudflare Workers account
+
+### API Errors
+- Open-Meteo has rate limits - wait a moment and try again
+- Check browser console for specific error messages
+- Verify internet connection
+
+### Radar Not Loading
+- Check browser console for iframe errors
+- Verify Ventusky proxy is working
+- Try clearing browser cache
+
+## 📝 License
+
+MIT License - feel free to use this project for personal or commercial purposes.
+
+## 🙏 Credits
+
+- **Weather Data**: [Open-Meteo](https://open-meteo.com/) - Free, open-source weather API
+- **Weather Maps**: [Ventusky](https://www.ventusky.com/) - Interactive weather visualization
+- **Icons**: [Font Awesome](https://fontawesome.com/) - Icon library
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- **Charts**: [Chart.js](https://www.chartjs.org/) - JavaScript charting library
+- **Reverse Geocoding**: [BigDataCloud](https://www.bigdatacloud.com/) - Free reverse geocoding API
+
+## 👤 Author
+
+**Jack A** - Vibecoded with ❤️
+
+---
+
+For issues, questions, or contributions, please open an issue on the [GitHub repository](https://github.com/anglim3/jaccuweather).
