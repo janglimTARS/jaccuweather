@@ -505,6 +505,115 @@ export default {
       }
     }
     
+    // Proxy Ventusky iframe with desktop user agent to remove mobile download button
+    if (url.pathname.startsWith('/ventusky-proxy')) {
+      try {
+        // Extract Ventusky path and parameters
+        // Remove /ventusky-proxy prefix to get the Ventusky path (e.g., /precipitation-map)
+        const ventuskyPath = url.pathname.replace('/ventusky-proxy', '') || '/precipitation-map';
+        const ventuskyParams = url.search;
+        const ventuskyUrl = \`https://www.ventusky.com\${ventuskyPath}\${ventuskyParams}\`;
+        
+        // Fetch with desktop user agent to get desktop version (no download button)
+        const response = await fetch(ventuskyUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+        });
+        
+        if (!response.ok) {
+          return new Response('Failed to load Ventusky', { status: response.status });
+        }
+        
+        // Get the HTML content
+        let html = await response.text();
+        
+        // Inject CSS and JavaScript to hide download button
+        const hideButtonScript = \`
+          <style>
+            /* Hide download app button */
+            a[href*="app"], 
+            button[class*="app"],
+            div[class*="app-button"],
+            div[class*="download"],
+            a[class*="download"],
+            button[class*="download"],
+            [data-app-button],
+            [id*="app-button"],
+            [id*="download-button"] {
+              display: none !important;
+              visibility: hidden !important;
+              opacity: 0 !important;
+              height: 0 !important;
+              width: 0 !important;
+              overflow: hidden !important;
+            }
+          </style>
+          <script>
+            // Additional JavaScript to hide button after page loads
+            (function() {
+              function hideDownloadButton() {
+                const selectors = [
+                  'a[href*="app"]',
+                  'button[class*="app"]',
+                  'div[class*="app-button"]',
+                  'div[class*="download"]',
+                  'a[class*="download"]',
+                  'button[class*="download"]',
+                  '[data-app-button]',
+                  '[id*="app-button"]',
+                  '[id*="download-button"]'
+                ];
+                selectors.forEach(selector => {
+                  document.querySelectorAll(selector).forEach(el => {
+                    el.style.display = 'none';
+                    el.style.visibility = 'hidden';
+                    el.style.opacity = '0';
+                    el.style.height = '0';
+                    el.style.width = '0';
+                  });
+                });
+              }
+              // Run immediately and on various events
+              hideDownloadButton();
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', hideDownloadButton);
+              }
+              window.addEventListener('load', hideDownloadButton);
+              // Use MutationObserver to catch dynamically added buttons
+              const observer = new MutationObserver(hideDownloadButton);
+              observer.observe(document.body, { childList: true, subtree: true });
+              // Also run periodically as fallback
+              setInterval(hideDownloadButton, 1000);
+            })();
+          </script>
+        \`;
+        
+        // Inject the script before closing head tag, or at the beginning of body
+        if (html.includes('</head>')) {
+          html = html.replace('</head>', hideButtonScript + '</head>');
+        } else if (html.includes('<body')) {
+          html = html.replace('<body', hideButtonScript + '<body');
+        } else {
+          html = hideButtonScript + html;
+        }
+        
+        // Return modified HTML with proper headers
+        return new Response(html, {
+          headers: {
+            'Content-Type': 'text/html;charset=UTF-8',
+            'X-Frame-Options': 'ALLOWALL',
+            'Content-Security-Policy': "frame-ancestors *;",
+          },
+        });
+      } catch (error) {
+        console.error('Ventusky proxy error:', error);
+        return new Response('Error proxying Ventusky', { status: 500 });
+      }
+    }
+    
     return new Response('Not Found', { status: 404 });
   },
 };

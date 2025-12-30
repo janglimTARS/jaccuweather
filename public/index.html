@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jack's Weather Forecast</title>
+    <title>Jaccuweather</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Jack's Weather">
-    <meta property="og:title" content="Jack's Weather Forecast">
+    <meta name="apple-mobile-web-app-title" content="Jaccuweather">
+    <meta property="og:title" content="Jaccuweather">
     <meta property="og:description" content="Real-time weather forecasts with radar, hourly and daily forecasts">
     <meta property="og:type" content="website">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -87,12 +87,50 @@
             transform: scale(1.05);
             background: rgba(255, 255, 255, 0.15) !important;
         }
-        #radarMap {
+        .ventusky-iframe-container {
+            position: relative;
+            width: 100%;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            height: 0;
+            padding-bottom: 100%; /* Default square aspect ratio for desktop */
+            /* Prevent accidental interactions when scrolling */
+            pointer-events: auto;
+        }
+        /* Taller aspect ratio on mobile to give more space for map content and reduce clutter */
+        @media (max-width: 768px) {
+            .ventusky-iframe-container {
+                padding-bottom: 180%; /* 1.8:1 aspect ratio - much taller on mobile to accommodate Ventusky controls */
+            }
+        }
+        .ventusky-iframe-container iframe {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            pointer-events: auto;
+        }
+        /* Try to hide common download button selectors (may not work due to iframe cross-origin) */
+        @supports selector(:has(*)) {
+            .ventusky-iframe-container:has(iframe) {
+                overflow: hidden;
+            }
+        }
+        /* Additional attempt - hide bottom portion where download button typically appears */
+        @media (max-width: 768px) {
+            .ventusky-iframe-container::after {
+                content: '';
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 60px;
+                background: linear-gradient(to top, rgba(55, 65, 81, 0.95) 0%, rgba(55, 65, 81, 0) 100%);
+                pointer-events: none;
+                z-index: 10;
+                border-radius: 0 0 0.5rem 0.5rem;
+            }
         }
     </style>
 </head>
@@ -101,9 +139,9 @@
         <!-- Header -->
         <div class="text-center mb-8">
             <h1 class="text-4xl md:text-5xl font-bold text-white mb-2">
-                <i class="fas fa-cloud-sun mr-3"></i>Jack's Weather Forecast
+                <i class="fas fa-cloud-sun mr-3"></i>Jaccuweather
             </h1>
-            <p class="text-white/80">Powered by Open-Meteo & National Weather Service</p>
+            <p class="text-white/80">Powered by Open-Meteo & Ventusky</p>
         </div>
 
         <!-- Weather Alerts -->
@@ -261,56 +299,17 @@
                     <i class="fas fa-radar mr-2"></i>Weather Radar
                 </h3>
                 <div id="radarContainer" class="relative">
-                    <!-- Leaflet map for wind layer -->
-                    <div id="radarMap" style="height: 0; width: 100%; padding-bottom: 100%; border-radius: 0.5rem; overflow: hidden; position: relative; display: none;">
-                        <!-- Legend - Top Right -->
-                        <div id="radarLegend" class="absolute top-4 right-4 z-[1000]"></div>
-                        <!-- Current Frame Time Display - Top Left -->
-                        <div id="radarTimeDisplay" class="absolute top-4 left-4 z-[1000] bg-white/20 backdrop-blur-sm rounded-lg text-white px-3 py-2 border border-white/30 text-xs whitespace-nowrap hidden">
-                            <i class="fas fa-clock mr-1"></i><span id="radarTimeText">--:-- --</span>
-                        </div>
-                        <!-- Navigation Controls - Bottom Left Corner of Map, All in a Row -->
-                        <div class="absolute bottom-4 left-4 z-[1000] flex items-center gap-2">
-                        <!-- Zoom Controls -->
-                        <button id="radarZoomIn" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white p-2 border border-white/30 transition-all" title="Zoom In">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                        <button id="radarZoomOut" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white p-2 border border-white/30 transition-all" title="Zoom Out">
-                            <i class="fas fa-minus"></i>
-                        </button>
-                        <!-- Divider -->
-                        <div class="w-px h-6 bg-white/30"></div>
-                        <!-- Pan Controls -->
-                        <button id="radarMoveUp" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white p-2 border border-white/30 transition-all" title="Move Up">
-                            <i class="fas fa-arrow-up"></i>
-                        </button>
-                        <button id="radarMoveDown" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white p-2 border border-white/30 transition-all" title="Move Down">
-                            <i class="fas fa-arrow-down"></i>
-                        </button>
-                        <button id="radarMoveLeft" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white p-2 border border-white/30 transition-all" title="Move Left">
-                            <i class="fas fa-arrow-left"></i>
-                        </button>
-                        <button id="radarMoveRight" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white p-2 border border-white/30 transition-all" title="Move Right">
-                            <i class="fas fa-arrow-right"></i>
-                        </button>
-                        <!-- Divider -->
-                        <div class="w-px h-6 bg-white/30"></div>
-                        <!-- Play/Pause Animation Button -->
-                        <button id="radarPlayPause" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white p-2 border border-white/30 transition-all" title="Play Animation">
-                            <i class="fas fa-play"></i>
-                        </button>
-                        </div>
-                    </div>
-                    <div class="mt-4 space-y-3">
-                        <!-- Layer Selection -->
-                        <div class="flex items-center justify-center gap-2">
-                            <button id="radarLayerPrecipitation" class="radar-layer-btn px-4 py-2 bg-blue-500/30 hover:bg-blue-500/40 rounded-lg transition-all text-white font-semibold border-2 border-blue-400">
-                                <i class="fas fa-cloud-rain mr-2"></i>Precipitation
-                            </button>
-                            <button id="radarLayerWind" class="radar-layer-btn px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all text-white font-semibold border-2 border-transparent">
-                                <i class="fas fa-wind mr-2"></i>Wind
-                            </button>
-                        </div>
+                    <!-- Ventusky iframe -->
+                    <div id="ventuskyContainer" class="ventusky-iframe-container">
+                        <iframe 
+                            id="ventuskyFrame"
+                            src="" 
+                            style="border: none;"
+                            allowfullscreen
+                            loading="lazy"
+                            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                            referrerpolicy="no-referrer-when-downgrade">
+                        </iframe>
                     </div>
                 </div>
             </div>
@@ -383,6 +382,11 @@
     </div>
 
     <script src="/app.js"></script>
+    
+    <!-- Footer -->
+    <footer class="text-center mt-8 mb-4">
+        <p class="text-white/60 text-sm">Vibecoded with ❤️ by Jack A</p>
+    </footer>
 </body>
 </html>
 
