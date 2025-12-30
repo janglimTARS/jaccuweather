@@ -117,6 +117,11 @@
                 overflow: hidden;
             }
         }
+        /* Make heart emoji match text color */
+        footer span {
+            filter: grayscale(100%) brightness(0) invert(1) opacity(0.6);
+            display: inline-block;
+        }
         /* Additional attempt - hide bottom portion where download button typically appears */
         @media (max-width: 768px) {
             .ventusky-iframe-container::after {
@@ -228,7 +233,7 @@
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mt-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-4 mt-6">
                     <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
                         <div class="text-white/70 text-sm mb-1"><i class="fas fa-thermometer-half text-orange-300 mr-1"></i>Feels Like</div>
                         <div id="feelsLike" class="text-2xl font-bold text-white"></div>
@@ -252,6 +257,13 @@
                     <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
                         <div class="text-white/70 text-sm mb-1"><i class="fas fa-moon text-blue-300 mr-1"></i>Sunset</div>
                         <div id="sunset" class="text-xl font-bold text-white"></div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-moon text-purple-300 mr-1"></i>Moon Phase</div>
+                        <div id="moonPhase" class="text-xl font-bold text-white flex items-center gap-2">
+                            <span id="moonPhaseEmoji" class="text-2xl"></span>
+                            <span id="moonPhaseName" class="text-sm"></span>
+                        </div>
                     </div>
                     <div id="airQualitySection" class="bg-white/10 rounded-lg p-4 backdrop-blur-sm hidden">
                         <div class="text-white/70 text-sm mb-1"><i class="fas fa-wind mr-1"></i>Air Quality</div>
@@ -286,7 +298,7 @@
             <!-- Daily Forecast -->
             <div class="weather-card rounded-2xl p-6 md:p-8 mb-6 border border-white/20 shadow-2xl">
                 <h3 class="text-2xl font-bold text-white mb-4 cursor-pointer hover:text-gray-200 transition-colors" id="dailyHeader">
-                    <i class="fas fa-calendar-alt mr-2"></i>7-Day Forecast <i class="fas fa-external-link-alt ml-2 text-sm"></i>
+                    <i class="fas fa-calendar-alt mr-2"></i>14-Day Forecast <i class="fas fa-external-link-alt ml-2 text-sm"></i>
                 </h3>
                 <div id="dailyForecast" class="space-y-3">
                     <!-- Daily items will be inserted here -->
@@ -355,7 +367,7 @@
         <div class="modal-content p-6 md:p-8">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-3xl font-bold text-white">
-                    <i class="fas fa-calendar-alt mr-2"></i>7-Day Detailed Forecast
+                    <i class="fas fa-calendar-alt mr-2"></i>14-Day Detailed Forecast
                 </h2>
                 <button id="closeDailyModal" class="text-white hover:text-gray-300 text-2xl">
                     <i class="fas fa-times"></i>
@@ -374,8 +386,58 @@
                 <div class="bg-white/10 rounded-lg p-4">
                     <canvas id="dailySnowChart" style="height: 250px;"></canvas>
                 </div>
+                <div class="bg-white/10 rounded-lg p-4">
+                    <canvas id="dailyMoonPhaseChart" style="height: 250px;"></canvas>
+                </div>
                 <div id="dailyDetails" class="space-y-3">
                     <!-- Detailed daily items will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Moon Details Modal -->
+    <div id="moonDetailsModal" class="modal">
+        <div class="modal-content p-6 md:p-8 max-w-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold text-white">
+                    <i class="fas fa-moon mr-2"></i>Moon Details
+                </h2>
+                <button id="closeMoonDetailsModal" class="text-white hover:text-gray-300 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="space-y-6">
+                <div class="text-center">
+                    <div id="moonDetailsEmoji" class="text-8xl mb-4"></div>
+                    <div id="moonDetailsName" class="text-2xl font-bold text-white mb-2"></div>
+                    <div id="moonDetailsDate" class="text-white/70"></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-sun text-yellow-300 mr-1"></i>Illumination</div>
+                        <div id="moonIllumination" class="text-2xl font-bold text-white"></div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-arrow-up text-blue-300 mr-1"></i>Moonrise</div>
+                        <div id="moonRise" class="text-2xl font-bold text-white"></div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-arrow-down text-orange-300 mr-1"></i>Moonset</div>
+                        <div id="moonSet" class="text-2xl font-bold text-white"></div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-ruler text-purple-300 mr-1"></i>Distance</div>
+                        <div id="moonDistance" class="text-2xl font-bold text-white"></div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-calendar text-green-300 mr-1"></i>Next Full Moon</div>
+                        <div id="nextFullMoon" class="text-2xl font-bold text-white"></div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-calendar text-gray-300 mr-1"></i>Next New Moon</div>
+                        <div id="nextNewMoon" class="text-2xl font-bold text-white"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -385,7 +447,7 @@
     
     <!-- Footer -->
     <footer class="text-center mt-8 mb-4">
-        <p class="text-white/60 text-sm">Vibecoded with ❤️ by Jack A</p>
+        <p class="text-white/60 text-sm">Vibecoded with <span class="text-white/60">❤️</span> by Jack A</p>
     </footer>
 </body>
 </html>
