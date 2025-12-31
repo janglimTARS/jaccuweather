@@ -652,6 +652,7 @@ function displayWeather(data) {
                 <div class="text-white/70 text-sm text-right min-w-[100px]">
                     ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[i] || 0} ${data.daily_units.precipitation_sum}</div>`}
                     ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[i]} ${data.daily_units.snowfall_sum || 'in'}</div>` : ''}
+                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[i] !== null && data.daily.precipitation_probability_max[i] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[i]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[i] !== null && data.daily.precipitation_probability_max[i] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[i]}%</div>` : '')}
                     <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[i]} ${data.daily_units.wind_speed_10m_max}</div>
                 </div>
             </div>
@@ -1424,9 +1425,9 @@ function openHourlyModal(data) {
                 <div><span class="text-white/70">Condition:</span> <span class="text-white">${getWeatherDescription(data.hourly.weather_code[idx])}</span></div>
                 <div><span class="text-white/70">Wind:</span> <span class="text-white">${wind[i]} ${data.hourly_units.wind_speed_10m}</span></div>
                 <div><span class="text-white/70">Humidity:</span> <span class="text-white">${humidity[i]}${data.hourly_units.relative_humidity_2m}</span></div>
-                ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation ? `<div><span class="text-white/70">Precip:</span> <span class="text-white">${precip[i]} ${data.hourly_units.precipitation || 'in'}</span></div>` : '')}
-                ${data.hourly.snowfall && snow[i] > 0 ? `<div><span class="text-white/70">Snow:</span> <span class="text-white">${snow[i]} ${data.hourly_units.snowfall || 'in'}</span></div>` : ''}
-                ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation_probability ? `<div><span class="text-white/70">Rain Chance:</span> <span class="text-white">${data.hourly.precipitation_probability[idx]}%</span></div>` : '')}
+                ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation ? `<div><span class="text-white/70">Precip:</span> <span class="text-white">${precip[i]} ${data.hourly_units.precipitation || 'in'}</span>${data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined ? ` <span class="text-white/60">(${data.hourly.precipitation_probability[idx]}%)</span>` : ''}</div>` : '')}
+                ${data.hourly.snowfall && snow[i] > 0 ? `<div><span class="text-white/70">Snow:</span> <span class="text-white">${snow[i]} ${data.hourly_units.snowfall || 'in'}</span>${data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined ? ` <span class="text-white/60">(${data.hourly.precipitation_probability[idx]}%)</span>` : ''}</div>` : ''}
+                ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined && !data.hourly.precipitation ? `<div><span class="text-white/70">Rain Chance:</span> <span class="text-white">${data.hourly.precipitation_probability[idx]}%</span></div>` : '')}
             </div>
             <div class="mt-2 text-white/80 text-sm">${getWeatherDescription(data.hourly.weather_code[idx])}</div>
         `;
@@ -1594,15 +1595,22 @@ function openDailyModal(data) {
         })
     };
     
-    // Hide/show charts based on snow presence
+    // Hide/show charts based on rain and snow presence
     const snowChartContainer = document.getElementById('dailySnowChart').parentElement;
     const precipChartContainer = document.getElementById('dailyPrecipChart').parentElement;
     const hasSnow = snowfall.some(val => val > 0);
+    const hasRain = precip.some(val => val > 0);
     
-    if (hasSnow) {
+    // Show both charts if both rain and snow are present
+    if (hasSnow && hasRain) {
+        snowChartContainer.style.display = 'block';
+        precipChartContainer.style.display = 'block';
+    } else if (hasSnow) {
+        // Only snow, show snow chart
         snowChartContainer.style.display = 'block';
         precipChartContainer.style.display = 'none';
     } else {
+        // Only rain or neither, show precipitation chart
         snowChartContainer.style.display = 'none';
         precipChartContainer.style.display = 'block';
     }
@@ -1633,23 +1641,19 @@ function openDailyModal(data) {
                 <div class="bg-white/10 rounded p-3">
                     <div class="text-white/70 text-xs mb-1"><i class="fas fa-snowflake mr-1"></i>Snowfall</div>
                     <div class="text-white font-bold">${snowfall[i]} ${data.daily_units.snowfall_sum || 'in'}</div>
+                    ${precipProb[i] !== null && precipProb[i] !== undefined ? `<div class="text-white/60 text-xs mt-1"><i class="fas fa-snowflake mr-1"></i>${precipProb[i]}%</div>` : ''}
                 </div>
                 ` : `
                 <div class="bg-white/10 rounded p-3">
                     <div class="text-white/70 text-xs mb-1">Precipitation</div>
                     <div class="text-white font-bold">${precip[i]} ${data.daily_units.precipitation_sum}</div>
+                    ${precipProb[i] !== null && precipProb[i] !== undefined ? `<div class="text-white/60 text-xs mt-1"><i class="fas fa-tint mr-1"></i>${precipProb[i]}%</div>` : ''}
                 </div>
                 `}
                 <div class="bg-white/10 rounded p-3">
                     <div class="text-white/70 text-xs mb-1">Wind Speed</div>
                     <div class="text-white font-bold">${wind[i]} ${data.daily_units.wind_speed_10m_max}</div>
                 </div>
-                ${snowfall[i] > 0 ? '' : (precipProb[i] > 0 ? `
-                <div class="bg-white/10 rounded p-3">
-                    <div class="text-white/70 text-xs mb-1">Rain Chance</div>
-                    <div class="text-white font-bold">${precipProb[i]}%</div>
-                </div>
-                ` : '')}
                 <div class="bg-white/10 rounded p-3 moon-phase-clickable" style="cursor: pointer;">
                     <div class="text-white/70 text-xs mb-1"><i class="fas fa-moon mr-1"></i>Moon Phase</div>
                     <div class="text-white font-bold flex items-center gap-2">
