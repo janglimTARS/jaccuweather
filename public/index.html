@@ -452,30 +452,43 @@
     <div id="hourlyModal" class="modal">
         <div class="modal-content p-6 md:p-8">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
-                    <span class="text-3xl">⏰</span> 24-Hour Detailed Forecast
-                </h2>
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                        <span class="text-3xl">⏰</span> 24-Hour Detailed Forecast
+                    </h2>
+                    <div class="mt-3">
+                        <select id="hourlyChartSelect" class="bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="all">All Charts</option>
+                            <option value="temp">Temperature</option>
+                            <option value="precip">Precipitation</option>
+                            <option value="wind">Wind Speed</option>
+                            <option value="humidity">Humidity</option>
+                            <option value="pressure">Pressure</option>
+                            <option value="snow">Snowfall</option>
+                        </select>
+                    </div>
+                </div>
                 <button id="closeHourlyModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="space-y-6">
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="temp">
                     <canvas id="hourlyTempChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="precip">
                     <canvas id="hourlyPrecipChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="wind">
                     <canvas id="hourlyWindChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="humidity">
                     <canvas id="hourlyHumidityChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="pressure">
                     <canvas id="hourlyPressureChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="snow">
                     <canvas id="hourlySnowChart" style="height: 250px;"></canvas>
                 </div>
                 <div id="hourlyDetails" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -489,30 +502,43 @@
     <div id="dailyModal" class="modal">
         <div class="modal-content p-6 md:p-8">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
-                    <span class="text-3xl">📅</span> 14-Day Detailed Forecast
-                </h2>
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                        <span class="text-3xl">📅</span> 14-Day Detailed Forecast
+                    </h2>
+                    <div class="mt-3">
+                        <select id="dailyChartSelect" class="bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="all">All Charts</option>
+                            <option value="temp">Temperature</option>
+                            <option value="precip">Precipitation</option>
+                            <option value="wind">Wind Speed</option>
+                            <option value="pressure">Pressure</option>
+                            <option value="snow">Snowfall</option>
+                            <option value="moon">Moon Phase</option>
+                        </select>
+                    </div>
+                </div>
                 <button id="closeDailyModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="space-y-6">
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="temp">
                     <canvas id="dailyTempChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="precip">
                     <canvas id="dailyPrecipChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="wind">
                     <canvas id="dailyWindChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="pressure">
                     <canvas id="dailyPressureChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="snow">
                     <canvas id="dailySnowChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="card rounded-xl p-4">
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="moon">
                     <canvas id="dailyMoonPhaseChart" style="height: 250px;"></canvas>
                 </div>
                 <div id="dailyDetails" class="space-y-3">
