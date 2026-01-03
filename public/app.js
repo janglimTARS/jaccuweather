@@ -1441,6 +1441,35 @@ function displayAirQuality(data) {
     aqiStatus.className = `text-white/90 text-xs mt-1 ${color}`;
 }
 
+// Chart selector functionality
+function initializeChartSelector(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    const modal = select.closest('.modal');
+    const chartContainers = modal.querySelectorAll('.chart-container');
+
+    function updateChartVisibility() {
+        const selectedValue = select.value;
+
+        chartContainers.forEach(container => {
+            if (selectedValue === 'all') {
+                container.style.display = 'block';
+            } else {
+                const chartType = container.getAttribute('data-chart-type');
+                container.style.display = chartType === selectedValue ? 'block' : 'none';
+            }
+        });
+    }
+
+    // Set initial state to show temperature chart
+    select.value = 'temp';
+    updateChartVisibility();
+
+    // Add change event listener
+    select.addEventListener('change', updateChartVisibility);
+}
+
 // Modal functionality
 function openHourlyModal(data) {
     const modal = document.getElementById('hourlyModal');
@@ -1631,6 +1660,9 @@ function openHourlyModal(data) {
         `;
         detailsContainer.appendChild(detailItem);
     }
+
+    // Initialize chart selection dropdown
+    initializeChartSelector('hourlyChartSelect');
 }
 
 function openDailyModal(data) {
@@ -1923,6 +1955,9 @@ function openDailyModal(data) {
         
         detailsContainer.appendChild(detailItem);
     }
+
+    // Initialize chart selection dropdown
+    initializeChartSelector('dailyChartSelect');
 }
 
 // Modal close handlers
