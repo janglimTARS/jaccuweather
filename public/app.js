@@ -1465,6 +1465,7 @@ function openHourlyModal(data) {
     const snow = [];
     const wind = [];
     const humidity = [];
+    const pressure = [];
     const labels = [];
     
     for (let i = 0; i < 24 && (startIndex + i) < data.hourly.time.length; i++) {
@@ -1477,6 +1478,8 @@ function openHourlyModal(data) {
         snow.push(data.hourly.snowfall ? data.hourly.snowfall[idx] : 0);
         wind.push(data.hourly.wind_speed_10m[idx]);
         humidity.push(data.hourly.relative_humidity_2m[idx]);
+        // Convert hPa to inHg (1 hPa = 0.02953 inHg)
+        pressure.push(data.hourly.surface_pressure ? (data.hourly.surface_pressure[idx] * 0.02953).toFixed(2) : null);
     }
     
     // Create charts
@@ -1554,6 +1557,19 @@ function openHourlyModal(data) {
                 }]
             }
         }),
+        pressure: new Chart(document.getElementById('hourlyPressureChart'), {
+            ...chartConfig,
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Pressure (inHg)',
+                    data: pressure,
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                    tension: 0.4
+                }]
+            }
+        }),
         snow: new Chart(document.getElementById('hourlySnowChart'), {
             ...chartConfig,
             data: {
@@ -1600,6 +1616,7 @@ function openHourlyModal(data) {
                 <div><span class="text-white/70">Condition:</span> <span class="text-white">${getWeatherDescription(data.hourly.weather_code[idx])}</span></div>
                 <div><span class="text-white/70">Wind:</span> <span class="text-white">${wind[i]} ${data.hourly_units.wind_speed_10m}</span></div>
                 <div><span class="text-white/70">Humidity:</span> <span class="text-white">${humidity[i]}${data.hourly_units.relative_humidity_2m}</span></div>
+                ${pressure[i] ? `<div><span class="text-white/70">Pressure:</span> <span class="text-white">${pressure[i]}" inHg</span></div>` : ''}
                 ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation ? `<div><span class="text-white/70">Precip:</span> <span class="text-white">${precip[i]} ${data.hourly_units.precipitation || 'in'}</span>${data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined ? ` <span class="text-white/60">(${data.hourly.precipitation_probability[idx]}%)</span>` : ''}</div>` : '')}
                 ${data.hourly.snowfall && snow[i] > 0 ? `<div><span class="text-white/70">Snow:</span> <span class="text-white">${snow[i]} ${data.hourly_units.snowfall || 'in'}</span>${data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined ? ` <span class="text-white/60">(${data.hourly.precipitation_probability[idx]}%)</span>` : ''}</div>` : ''}
                 ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined && !data.hourly.precipitation ? `<div><span class="text-white/70">Rain Chance:</span> <span class="text-white">${data.hourly.precipitation_probability[idx]}%</span></div>` : '')}
@@ -1630,6 +1647,7 @@ function openDailyModal(data) {
     const wind = [];
     const precipProb = [];
     const moonPhases = [];
+    const dailyPressure = [];
     
     for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
         const day = parseDateString(data.daily.time[i]);
@@ -1641,6 +1659,26 @@ function openDailyModal(data) {
         wind.push(data.daily.wind_speed_10m_max[i]);
         precipProb.push(data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[i] : 0);
         moonPhases.push(calculateMoonPhase(day));
+        
+        // Calculate daily average pressure from hourly data (noon value for each day)
+        if (data.hourly && data.hourly.surface_pressure) {
+            const dayStr = data.daily.time[i];
+            const noonIdx = data.hourly.time.findIndex(t => t.startsWith(dayStr) && t.includes('T12:'));
+            if (noonIdx !== -1) {
+                // Convert hPa to inHg
+                dailyPressure.push((data.hourly.surface_pressure[noonIdx] * 0.02953).toFixed(2));
+            } else {
+                // Fallback: use first hour of the day
+                const dayIdx = data.hourly.time.findIndex(t => t.startsWith(dayStr));
+                if (dayIdx !== -1) {
+                    dailyPressure.push((data.hourly.surface_pressure[dayIdx] * 0.02953).toFixed(2));
+                } else {
+                    dailyPressure.push(null);
+                }
+            }
+        } else {
+            dailyPressure.push(null);
+        }
     }
     
     // Create charts
@@ -1706,6 +1744,19 @@ function openDailyModal(data) {
                     data: wind,
                     borderColor: 'rgb(255, 206, 86)',
                     backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                    tension: 0.4
+                }]
+            }
+        }),
+        pressure: new Chart(document.getElementById('dailyPressureChart'), {
+            ...chartConfig,
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Pressure (inHg)',
+                    data: dailyPressure,
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
                     tension: 0.4
                 }]
             }
@@ -1807,7 +1858,7 @@ function openDailyModal(data) {
                 </div>
                 <div class="text-4xl">${getWeatherIcon(data.daily.weather_code[i])}</div>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div class="bg-white/10 rounded p-3">
                     <div class="text-white/70 text-xs mb-1">High / Low</div>
                     <div class="text-white font-bold">${Math.round(maxTemps[i])}${data.daily_units.temperature_2m_max} / ${Math.round(minTemps[i])}${data.daily_units.temperature_2m_min}</div>
@@ -1829,6 +1880,12 @@ function openDailyModal(data) {
                     <div class="text-white/70 text-xs mb-1">Wind Speed</div>
                     <div class="text-white font-bold">${wind[i]} ${data.daily_units.wind_speed_10m_max}</div>
                 </div>
+                ${dailyPressure[i] ? `
+                <div class="bg-white/10 rounded p-3">
+                    <div class="text-white/70 text-xs mb-1"><i class="fas fa-gauge mr-1"></i>Pressure</div>
+                    <div class="text-white font-bold">${dailyPressure[i]}" inHg</div>
+                </div>
+                ` : ''}
                 <div class="bg-white/10 rounded p-3 moon-phase-clickable" style="cursor: pointer;">
                     <div class="text-white/70 text-xs mb-1"><i class="fas fa-moon mr-1"></i>Moon Phase</div>
                     <div class="text-white font-bold flex items-center gap-2">
