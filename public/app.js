@@ -449,7 +449,7 @@ async function fetchWeather(lat, lon) {
 
     try {
         // Make direct request to Open-Meteo from browser (uses user's IP, not shared Cloudflare IP)
-        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
 
         // Check for rate limiting before parsing JSON
         if (weatherResponse.status === 429) {
@@ -562,12 +562,25 @@ function displayWeather(data) {
         month: 'long', 
         day: 'numeric' 
     });
+    
+    // Last updated timestamp
+    document.getElementById('lastUpdated').textContent = `Updated ${formatLastUpdated(new Date())}`;
+    
     document.getElementById('currentTemp').textContent = `${Math.round(data.current.temperature_2m)}${data.current_units.temperature_2m}`;
     document.getElementById('currentCondition').textContent = getWeatherDescription(data.current.weather_code);
     document.getElementById('feelsLike').textContent = `${Math.round(data.current.apparent_temperature)}${data.current_units.apparent_temperature}`;
     document.getElementById('humidity').textContent = `${data.current.relative_humidity_2m}${data.current_units.relative_humidity_2m}`;
+    
+    // Dew point
+    if (data.current.dewpoint_2m !== undefined) {
+        document.getElementById('dewPoint').textContent = `${Math.round(data.current.dewpoint_2m)}${data.current_units.dewpoint_2m}`;
+    }
+    
     document.getElementById('windSpeed').textContent = `${data.current.wind_speed_10m} ${data.current_units.wind_speed_10m}`;
     document.getElementById('uvIndex').textContent = data.current.uv_index;
+    
+    // Pressure with trend
+    displayPressure(data);
     
     // Sunrise and sunset times (for today, index 0)
     if (data.daily && data.daily.sunrise && data.daily.sunrise[0]) {
@@ -592,6 +605,9 @@ function displayWeather(data) {
         moonPhaseCard.style.cursor = 'pointer';
         moonPhaseCard.addEventListener('click', () => openMoonDetailsModal(today));
     }
+    
+    // Precipitation timing
+    displayPrecipitationTiming(data);
 
     // Hourly forecast
     const hourlyContainer = document.getElementById('hourlyForecast').querySelector('.flex');
@@ -1010,6 +1026,165 @@ function parseDateString(dateString) {
     }
     // Fallback to regular Date parsing if format is different
     return new Date(dateString);
+}
+
+function formatLastUpdated(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) {
+        return 'just now';
+    } else if (diffMins === 1) {
+        return '1 minute ago';
+    } else if (diffMins < 60) {
+        return `${diffMins} minutes ago`;
+    } else {
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours === 1) {
+            return '1 hour ago';
+        } else {
+            return `${diffHours} hours ago`;
+        }
+    }
+}
+
+function displayPressure(data) {
+    const pressureElement = document.getElementById('pressure');
+    const trendElement = document.getElementById('pressureTrend');
+    const statusElement = document.getElementById('pressureStatus');
+    
+    if (!data.current.surface_pressure) {
+        return;
+    }
+    
+    // Convert hPa to inHg (1 hPa = 0.02953 inHg)
+    const pressureInHg = (data.current.surface_pressure * 0.02953).toFixed(2);
+    pressureElement.textContent = `${pressureInHg}"`;
+    
+    // Calculate pressure trend by comparing to 3 hours ago
+    let trend = '';
+    let trendText = 'Steady';
+    
+    if (data.hourly && data.hourly.surface_pressure) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        
+        // Find current hour index
+        let currentIdx = -1;
+        for (let i = 0; i < data.hourly.time.length; i++) {
+            const hourTime = new Date(data.hourly.time[i]);
+            if (hourTime.getHours() === currentHour && hourTime.getDate() === now.getDate()) {
+                currentIdx = i;
+                break;
+            }
+        }
+        
+        // Compare to 3 hours ago
+        if (currentIdx >= 3) {
+            const currentPressure = data.hourly.surface_pressure[currentIdx];
+            const pastPressure = data.hourly.surface_pressure[currentIdx - 3];
+            const diff = currentPressure - pastPressure;
+            
+            if (diff > 1) {
+                trend = '↑';
+                trendText = 'Rising';
+                trendElement.className = 'text-lg text-green-400';
+            } else if (diff < -1) {
+                trend = '↓';
+                trendText = 'Falling';
+                trendElement.className = 'text-lg text-red-400';
+            } else {
+                trend = '→';
+                trendText = 'Steady';
+                trendElement.className = 'text-lg text-gray-400';
+            }
+        }
+    }
+    
+    trendElement.textContent = trend;
+    statusElement.textContent = trendText;
+}
+
+function displayPrecipitationTiming(data) {
+    const section = document.getElementById('precipTimingSection');
+    const timingText = document.getElementById('precipTiming');
+    const icon = document.getElementById('precipIcon');
+    
+    if (!data.hourly || !data.hourly.precipitation) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Find current hour index
+    let startIndex = 0;
+    for (let i = 0; i < data.hourly.time.length; i++) {
+        const hourTime = new Date(data.hourly.time[i]);
+        if (hourTime.getHours() >= currentHour && hourTime.getDate() === now.getDate()) {
+            startIndex = i;
+            break;
+        }
+    }
+    
+    // Look ahead 24 hours for precipitation
+    let precipStartTime = null;
+    let precipEndTime = null;
+    let isSnow = false;
+    let precipAmount = 0;
+    
+    for (let i = startIndex; i < Math.min(startIndex + 24, data.hourly.time.length); i++) {
+        const precip = data.hourly.precipitation[i] || 0;
+        const snow = data.hourly.snowfall ? (data.hourly.snowfall[i] || 0) : 0;
+        
+        if (precip > 0 || snow > 0) {
+            if (!precipStartTime) {
+                precipStartTime = new Date(data.hourly.time[i]);
+                isSnow = snow > 0;
+            }
+            precipAmount += precip + snow;
+            precipEndTime = new Date(data.hourly.time[i]);
+        } else if (precipStartTime && !precipEndTime) {
+            // Gap in precipitation - could end the period here
+            break;
+        }
+    }
+    
+    if (!precipStartTime) {
+        // No precipitation expected
+        icon.textContent = '☀️';
+        timingText.textContent = 'No precipitation expected in the next 24 hours';
+        section.classList.remove('hidden');
+    } else {
+        const startHour = precipStartTime.getHours();
+        const nowHour = now.getHours();
+        const startDate = precipStartTime.getDate();
+        const nowDate = now.getDate();
+        
+        icon.textContent = isSnow ? '❄️' : '🌧️';
+        
+        // Check if precipitation is happening now (within the current hour)
+        if (startHour === nowHour && startDate === nowDate) {
+            const precipType = isSnow ? 'Snow' : 'Rain';
+            timingText.textContent = `${precipType} is currently falling`;
+        } else {
+            const precipType = isSnow ? 'Snow' : 'Rain';
+            const timeStr = formatTime12Hour(precipStartTime);
+            
+            // Check if it's today or tomorrow
+            if (startDate === nowDate) {
+                timingText.textContent = `${precipType} expected around ${timeStr}`;
+            } else if (startDate === nowDate + 1) {
+                timingText.textContent = `${precipType} expected tomorrow around ${timeStr}`;
+            } else {
+                const dayName = precipStartTime.toLocaleDateString('en-US', { weekday: 'long' });
+                timingText.textContent = `${precipType} expected ${dayName} around ${timeStr}`;
+            }
+        }
+        section.classList.remove('hidden');
+    }
 }
 
 function showLoading() {
