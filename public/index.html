@@ -13,6 +13,17 @@
     <meta property="og:description" content="Real-time weather forecasts with radar, hourly and daily forecasts">
     <meta property="og:type" content="website">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -20,15 +31,33 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.wms@0.2.0/dist/leaflet.wms.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         body {
-            background: #374151;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
         }
-        .weather-card {
+        
+        .card {
+            background: rgba(31, 41, 55, 0.8);
             backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(75, 85, 99, 0.5);
         }
-        .loading {
+        
+        .skeleton {
+            background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .loading-spinner {
             display: inline-block;
             width: 20px;
             height: 20px;
@@ -37,9 +66,30 @@
             border-top-color: #fff;
             animation: spin 1s ease-in-out infinite;
         }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        ::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        
         .modal {
             display: none;
             position: fixed;
@@ -49,20 +99,22 @@
             width: 100%;
             height: 100%;
             overflow: auto;
-            background-color: rgba(0,0,0,0.7);
+            background-color: rgba(0,0,0,0.75);
             backdrop-filter: blur(5px);
         }
+        
         .modal.active {
             display: flex;
             align-items: center;
             justify-content: center;
         }
+        
         .modal-content {
-            background: rgba(107, 114, 128, 0.95);
+            background: rgba(31, 41, 55, 0.95);
             backdrop-filter: blur(20px);
             margin: auto;
             padding: 0;
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(75, 85, 99, 0.5);
             border-radius: 1rem;
             width: 90%;
             max-width: 900px;
@@ -70,6 +122,7 @@
             overflow-y: auto;
             animation: modalSlideIn 0.3s ease-out;
         }
+        
         @keyframes modalSlideIn {
             from {
                 opacity: 0;
@@ -80,30 +133,44 @@
                 transform: translateY(0);
             }
         }
+        
         .clickable {
             cursor: pointer;
             transition: transform 0.2s, background 0.2s;
         }
+        
         .clickable:hover {
-            transform: scale(1.05);
-            background: rgba(255, 255, 255, 0.15) !important;
+            transform: scale(1.02);
+            background: rgba(75, 85, 99, 0.6) !important;
         }
+        
+        .stat-card {
+            background: rgba(55, 65, 81, 0.5);
+            border: 1px solid rgba(75, 85, 99, 0.5);
+            transition: all 0.2s ease;
+        }
+        
+        .stat-card:hover {
+            background: rgba(55, 65, 81, 0.7);
+            border-color: rgba(107, 114, 128, 0.6);
+        }
+        
         .ventusky-iframe-container {
             position: relative;
             width: 100%;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             overflow: hidden;
             height: 0;
-            padding-bottom: 100%; /* Default square aspect ratio for desktop */
-            /* Prevent accidental interactions when scrolling */
+            padding-bottom: 100%;
             pointer-events: auto;
         }
-        /* Taller aspect ratio on mobile to give more space for map content and reduce clutter */
+        
         @media (max-width: 768px) {
             .ventusky-iframe-container {
-                padding-bottom: 180%; /* 1.8:1 aspect ratio - much taller on mobile to accommodate Ventusky controls */
+                padding-bottom: 180%;
             }
         }
+        
         .ventusky-iframe-container iframe {
             position: absolute;
             top: 0;
@@ -112,18 +179,18 @@
             height: 100%;
             pointer-events: auto;
         }
-        /* Try to hide common download button selectors (may not work due to iframe cross-origin) */
+        
         @supports selector(:has(*)) {
             .ventusky-iframe-container:has(iframe) {
                 overflow: hidden;
             }
         }
-        /* Make heart emoji match text color */
+        
         footer span {
             filter: grayscale(100%) brightness(0) invert(1) opacity(0.6);
             display: inline-block;
         }
-        /* Additional attempt - hide bottom portion where download button typically appears */
+        
         @media (max-width: 768px) {
             .ventusky-iframe-container::after {
                 content: '';
@@ -132,23 +199,47 @@
                 left: 0;
                 right: 0;
                 height: 60px;
-                background: linear-gradient(to top, rgba(55, 65, 81, 0.95) 0%, rgba(55, 65, 81, 0) 100%);
+                background: linear-gradient(to top, rgba(26, 26, 46, 0.95) 0%, rgba(26, 26, 46, 0) 100%);
                 pointer-events: none;
                 z-index: 10;
-                border-radius: 0 0 0.5rem 0.5rem;
+                border-radius: 0 0 0.75rem 0.75rem;
             }
+        }
+        
+        .search-input {
+            background: rgba(55, 65, 81, 0.6);
+            border: 1px solid rgba(75, 85, 99, 0.5);
+            transition: all 0.2s ease;
+        }
+        
+        .search-input:focus {
+            background: rgba(55, 65, 81, 0.8);
+            border-color: rgba(107, 114, 128, 0.7);
+            box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.2);
+        }
+        
+        .btn {
+            background: rgba(55, 65, 81, 0.6);
+            border: 1px solid rgba(75, 85, 99, 0.5);
+            transition: all 0.2s ease;
+        }
+        
+        .btn:hover {
+            background: rgba(75, 85, 99, 0.7);
+            border-color: rgba(107, 114, 128, 0.6);
         }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="text-white p-4 md:p-8">
     <div class="max-w-6xl mx-auto">
         <!-- Header -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl md:text-5xl font-bold text-white mb-2">
-                <i class="fas fa-cloud-sun mr-3"></i>Jaccuweather
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3">
+                <span class="text-4xl">🌤️</span>
+                Jaccuweather
             </h1>
-            <p class="text-white/80">Powered by Open-Meteo & Ventusky</p>
-        </div>
+            <p class="text-gray-400 text-sm">Powered by Open-Meteo & Ventusky</p>
+        </header>
 
         <!-- Weather Alerts -->
         <div id="weatherAlerts" class="hidden mb-6 max-w-6xl mx-auto space-y-3">
@@ -162,18 +253,18 @@
                     type="text" 
                     id="locationInput" 
                     placeholder="Search for a city or location..."
-                    class="flex-1 min-w-[200px] px-4 py-3 rounded-lg bg-white/20 backdrop-blur-sm text-white placeholder-white/60 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    class="search-input flex-1 min-w-[200px] px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none"
                 >
                 <div class="flex gap-2">
                     <button 
                         id="searchBtn"
-                        class="px-4 md:px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white font-semibold transition-all border border-white/30"
+                        class="btn px-4 md:px-6 py-3 rounded-lg text-white font-semibold"
                     >
                         <i class="fas fa-search"></i>
                     </button>
                     <button 
                         id="locationBtn"
-                        class="px-4 md:px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white font-semibold transition-all border border-white/30"
+                        class="btn px-4 md:px-6 py-3 rounded-lg text-white font-semibold"
                         title="Use current location"
                     >
                         <i class="fas fa-location-arrow"></i>
@@ -181,16 +272,16 @@
                     <div class="relative">
                         <button 
                             id="favoritesBtn"
-                            class="px-4 md:px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white font-semibold transition-all border border-white/30"
+                            class="btn px-4 md:px-6 py-3 rounded-lg text-white font-semibold"
                             title="Favorites"
                         >
                             <i class="fas fa-star"></i>
                         </button>
-                        <div id="favoritesDropdown" class="hidden absolute right-0 mt-2 w-64 bg-gray-700/95 backdrop-blur-sm rounded-lg border border-white/30 shadow-xl z-50 max-h-96 overflow-y-auto">
-                            <div class="p-3 border-b border-white/20">
+                        <div id="favoritesDropdown" class="hidden absolute right-0 mt-2 w-64 card rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto">
+                            <div class="p-3 border-b border-gray-600/50">
                                 <div class="flex items-center justify-between">
                                     <h3 class="text-white font-semibold">Favorites</h3>
-                                    <button id="addFavoriteBtn" class="text-white/70 hover:text-white text-sm">
+                                    <button id="addFavoriteBtn" class="text-gray-400 hover:text-white text-sm">
                                         <i class="fas fa-plus mr-1"></i>Add Current
                                     </button>
                                 </div>
@@ -198,7 +289,7 @@
                             <div id="favoritesList" class="p-2">
                                 <!-- Favorites will be inserted here -->
                             </div>
-                            <div id="noFavorites" class="p-4 text-white/60 text-sm text-center hidden">
+                            <div id="noFavorites" class="p-4 text-gray-400 text-sm text-center hidden">
                                 No favorites yet. Add your current location to get started.
                             </div>
                         </div>
@@ -208,108 +299,108 @@
         </div>
 
         <!-- Error Message -->
-        <div id="errorMessage" class="hidden max-w-2xl mx-auto mb-4 p-4 bg-red-500/20 backdrop-blur-sm rounded-lg text-white border border-red-300/30">
+        <div id="errorMessage" class="hidden max-w-2xl mx-auto mb-4 p-4 bg-red-900/40 rounded-xl text-white border border-red-500/30">
             <i class="fas fa-exclamation-circle mr-2"></i>
             <span id="errorText"></span>
         </div>
 
         <!-- Loading State -->
         <div id="loading" class="hidden text-center py-12">
-            <div class="loading mx-auto mb-4"></div>
-            <p class="text-white">Loading weather data...</p>
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-300">Loading weather data...</p>
         </div>
 
         <!-- Main Content -->
         <div id="weatherContent" class="hidden">
             <!-- Current Weather -->
-            <div class="weather-card rounded-2xl p-6 md:p-8 mb-6 border border-white/20 shadow-2xl">
+            <section class="card rounded-2xl p-6 md:p-8 mb-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                     <div>
                         <h2 id="currentLocation" class="text-2xl md:text-3xl font-bold text-white mb-2"></h2>
-                        <p id="currentDate" class="text-white/80"></p>
+                        <p id="currentDate" class="text-gray-400"></p>
                     </div>
                     <div class="text-right mt-4 md:mt-0">
                         <div id="currentTemp" class="text-5xl md:text-6xl font-bold text-white mb-2"></div>
-                        <p id="currentCondition" class="text-xl text-white/90"></p>
+                        <p id="currentCondition" class="text-xl text-gray-300"></p>
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-4 mt-6">
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-thermometer-half text-orange-300 mr-1"></i>Feels Like</div>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-thermometer-half text-orange-400 mr-1"></i>Feels Like</div>
                         <div id="feelsLike" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-tint text-blue-300 mr-1"></i>Humidity</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-tint text-blue-400 mr-1"></i>Humidity</div>
                         <div id="humidity" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-wind text-gray-300 mr-1"></i>Wind Speed</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-wind text-gray-300 mr-1"></i>Wind Speed</div>
                         <div id="windSpeed" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-sun text-yellow-300 mr-1"></i>UV Index</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-sun text-yellow-400 mr-1"></i>UV Index</div>
                         <div id="uvIndex" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-sun text-yellow-400 mr-1"></i>Sunrise</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-sun text-yellow-500 mr-1"></i>Sunrise</div>
                         <div id="sunrise" class="text-xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-moon text-blue-300 mr-1"></i>Sunset</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-moon text-blue-300 mr-1"></i>Sunset</div>
                         <div id="sunset" class="text-xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-moon text-purple-300 mr-1"></i>Moon Phase</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-moon text-purple-400 mr-1"></i>Moon Phase</div>
                         <div id="moonPhase" class="text-xl font-bold text-white flex items-center gap-2">
                             <span id="moonPhaseEmoji" class="text-2xl"></span>
                             <span id="moonPhaseName" class="text-sm"></span>
                         </div>
                     </div>
-                    <div id="airQualitySection" class="bg-white/10 rounded-lg p-4 backdrop-blur-sm hidden">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-wind mr-1"></i>Air Quality</div>
+                    <div id="airQualitySection" class="stat-card rounded-xl p-4 hidden">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-wind mr-1"></i>Air Quality</div>
                         <div id="aqiValue" class="text-2xl font-bold text-white"></div>
-                        <div id="aqiStatus" class="text-white/90 text-xs mt-1"></div>
+                        <div id="aqiStatus" class="text-gray-300 text-xs mt-1"></div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- Weekly Snow Totals -->
-            <div id="weeklySnowSection" class="hidden weather-card rounded-2xl p-6 md:p-8 mb-6 border border-white/20 shadow-2xl">
-                <h3 class="text-2xl font-bold text-white mb-4">
-                    <i class="fas fa-snowflake mr-2"></i>Weekly Snow Totals
+            <section id="weeklySnowSection" class="hidden card rounded-2xl p-6 md:p-8 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <span class="text-2xl">❄️</span> Weekly Snow Totals
                 </h3>
                 <div id="weeklySnowContent" class="space-y-2">
                     <!-- Snow totals will be inserted here -->
                 </div>
-            </div>
+            </section>
 
             <!-- Hourly Forecast -->
-            <div class="weather-card rounded-2xl p-6 md:p-8 mb-6 border border-white/20 shadow-2xl">
-                <h3 class="text-2xl font-bold text-white mb-4 cursor-pointer hover:text-gray-200 transition-colors" id="hourlyHeader">
-                    <i class="fas fa-clock mr-2"></i>24-Hour Forecast <i class="fas fa-external-link-alt ml-2 text-sm"></i>
+            <section class="card rounded-2xl p-6 md:p-8 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4 cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-2" id="hourlyHeader">
+                    <span class="text-2xl">⏰</span> 24-Hour Forecast <i class="fas fa-external-link-alt ml-2 text-sm text-gray-400"></i>
                 </h3>
                 <div id="hourlyForecast" class="overflow-x-auto">
-                    <div class="flex gap-4 min-w-max pb-2">
+                    <div class="flex gap-3 min-w-max pb-2">
                         <!-- Hourly items will be inserted here -->
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- Daily Forecast -->
-            <div class="weather-card rounded-2xl p-6 md:p-8 mb-6 border border-white/20 shadow-2xl">
-                <h3 class="text-2xl font-bold text-white mb-4 cursor-pointer hover:text-gray-200 transition-colors" id="dailyHeader">
-                    <i class="fas fa-calendar-alt mr-2"></i>14-Day Forecast <i class="fas fa-external-link-alt ml-2 text-sm"></i>
+            <section class="card rounded-2xl p-6 md:p-8 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4 cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-2" id="dailyHeader">
+                    <span class="text-2xl">📅</span> 14-Day Forecast <i class="fas fa-external-link-alt ml-2 text-sm text-gray-400"></i>
                 </h3>
-                <div id="dailyForecast" class="space-y-3">
+                <div id="dailyForecast" class="space-y-2">
                     <!-- Daily items will be inserted here -->
                 </div>
-            </div>
+            </section>
 
             <!-- Weather Radar -->
-            <div class="weather-card rounded-2xl p-6 md:p-8 border border-white/20 shadow-2xl">
-                <h3 class="text-2xl font-bold text-white mb-4">
-                    <i class="fas fa-radar mr-2"></i>Weather Radar
+            <section class="card rounded-2xl p-6 md:p-8">
+                <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <span class="text-2xl">📡</span> Weather Radar
                 </h3>
                 <div id="radarContainer" class="relative">
                     <!-- Ventusky iframe -->
@@ -325,7 +416,7 @@
                         </iframe>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
 
@@ -333,27 +424,27 @@
     <div id="hourlyModal" class="modal">
         <div class="modal-content p-6 md:p-8">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-3xl font-bold text-white">
-                    <i class="fas fa-clock mr-2"></i>24-Hour Detailed Forecast
+                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                    <span class="text-3xl">⏰</span> 24-Hour Detailed Forecast
                 </h2>
-                <button id="closeHourlyModal" class="text-white hover:text-gray-300 text-2xl">
+                <button id="closeHourlyModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="space-y-6">
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="hourlyTempChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="hourlyPrecipChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="hourlyWindChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="hourlyHumidityChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="hourlySnowChart" style="height: 250px;"></canvas>
                 </div>
                 <div id="hourlyDetails" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -367,27 +458,27 @@
     <div id="dailyModal" class="modal">
         <div class="modal-content p-6 md:p-8">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-3xl font-bold text-white">
-                    <i class="fas fa-calendar-alt mr-2"></i>14-Day Detailed Forecast
+                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                    <span class="text-3xl">📅</span> 14-Day Detailed Forecast
                 </h2>
-                <button id="closeDailyModal" class="text-white hover:text-gray-300 text-2xl">
+                <button id="closeDailyModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="space-y-6">
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="dailyTempChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="dailyPrecipChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="dailyWindChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="dailySnowChart" style="height: 250px;"></canvas>
                 </div>
-                <div class="bg-white/10 rounded-lg p-4">
+                <div class="card rounded-xl p-4">
                     <canvas id="dailyMoonPhaseChart" style="height: 250px;"></canvas>
                 </div>
                 <div id="dailyDetails" class="space-y-3">
@@ -401,10 +492,10 @@
     <div id="moonDetailsModal" class="modal">
         <div class="modal-content p-6 md:p-8 max-w-2xl">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-3xl font-bold text-white">
-                    <i class="fas fa-moon mr-2"></i>Moon Details
+                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                    <span class="text-3xl">🌙</span> Moon Details
                 </h2>
-                <button id="closeMoonDetailsModal" class="text-white hover:text-gray-300 text-2xl">
+                <button id="closeMoonDetailsModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -412,31 +503,31 @@
                 <div class="text-center">
                     <div id="moonDetailsEmoji" class="text-8xl mb-4"></div>
                     <div id="moonDetailsName" class="text-2xl font-bold text-white mb-2"></div>
-                    <div id="moonDetailsDate" class="text-white/70"></div>
+                    <div id="moonDetailsDate" class="text-gray-400"></div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-sun text-yellow-300 mr-1"></i>Illumination</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-sun text-yellow-400 mr-1"></i>Illumination</div>
                         <div id="moonIllumination" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-arrow-up text-blue-300 mr-1"></i>Moonrise</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-arrow-up text-blue-400 mr-1"></i>Moonrise</div>
                         <div id="moonRise" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-arrow-down text-orange-300 mr-1"></i>Moonset</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-arrow-down text-orange-400 mr-1"></i>Moonset</div>
                         <div id="moonSet" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-ruler text-purple-300 mr-1"></i>Distance</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-ruler text-purple-400 mr-1"></i>Distance</div>
                         <div id="moonDistance" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-calendar text-green-300 mr-1"></i>Next Full Moon</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-calendar text-green-400 mr-1"></i>Next Full Moon</div>
                         <div id="nextFullMoon" class="text-2xl font-bold text-white"></div>
                     </div>
-                    <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                        <div class="text-white/70 text-sm mb-1"><i class="fas fa-calendar text-gray-300 mr-1"></i>Next New Moon</div>
+                    <div class="stat-card rounded-xl p-4">
+                        <div class="text-gray-400 text-sm mb-1"><i class="fas fa-calendar text-gray-300 mr-1"></i>Next New Moon</div>
                         <div id="nextNewMoon" class="text-2xl font-bold text-white"></div>
                     </div>
                 </div>
@@ -444,11 +535,19 @@
         </div>
     </div>
 
-    <script src="/app.js"></script>
+    <script src="app.js"></script>
     
     <!-- Footer -->
-    <footer class="text-center mt-8 mb-4">
-        <p class="text-white/60 text-sm">Vibecoded with <span class="text-white/60">❤️</span> by Jack A</p>
+    <footer class="text-center mt-8 mb-4 py-4 border-t border-gray-700/50">
+        <p class="text-gray-500 text-sm">Vibecoded with <span class="text-gray-500">❤️</span> by Jack A</p>
+        <p class="text-gray-600 text-xs mt-2">Weather data provided by Open-Meteo</p>
+        <a href="https://strike.me/anglim3" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center gap-2 mt-3 px-4 py-2 text-sm text-gray-400 hover:text-white bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600/50 hover:border-gray-500/50 rounded-lg transition-all">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.638 14.904c-1.602 6.43-8.113 10.34-14.542 8.736C2.67 22.05-1.244 15.525.362 9.105 1.962 2.67 8.475-1.243 14.9.358c6.43 1.605 10.342 8.115 8.738 14.548v-.002zm-6.35-4.613c.24-1.59-.974-2.45-2.64-3.03l.54-2.153-1.315-.33-.525 2.107c-.345-.087-.705-.167-1.064-.25l.526-2.127-1.32-.33-.54 2.165c-.285-.067-.565-.132-.84-.2l-1.815-.45-.35 1.407s.975.225.955.236c.535.136.63.486.615.766l-1.477 5.92c-.075.166-.24.406-.614.314.015.02-.96-.24-.96-.24l-.66 1.51 1.71.426.93.242-.54 2.19 1.32.327.54-2.17c.36.1.705.19 1.05.273l-.51 2.154 1.32.33.545-2.19c2.24.427 3.93.257 4.64-1.774.57-1.637-.03-2.58-1.217-3.196.854-.193 1.5-.76 1.68-1.93h.01zm-3.01 4.22c-.404 1.64-3.157.75-4.05.53l.72-2.9c.896.23 3.757.67 3.33 2.37zm.41-4.24c-.37 1.49-2.662.735-3.405.55l.654-2.64c.744.18 3.137.52 2.75 2.084v.006z"/>
+            </svg>
+            Donate
+        </a>
     </footer>
 </body>
 </html>
