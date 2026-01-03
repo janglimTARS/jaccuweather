@@ -1864,7 +1864,7 @@ function openDailyModal(data) {
                 </div>
                 <div class="text-4xl">${getWeatherIcon(data.daily.weather_code[i])}</div>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div class="bg-white/10 rounded p-3">
                     <div class="text-white/70 text-xs mb-1">High / Low</div>
                     <div class="text-white font-bold">${Math.round(maxTemps[i])}${data.daily_units.temperature_2m_max} / ${Math.round(minTemps[i])}${data.daily_units.temperature_2m_min}</div>
@@ -1897,6 +1897,15 @@ function openDailyModal(data) {
                     <div class="text-white font-bold flex items-center gap-2">
                         <span class="text-xl">${moonPhase.emoji}</span>
                         <span class="text-sm">${moonPhase.name}</span>
+                    </div>
+                </div>
+                <div class="bg-white/10 rounded p-3">
+                    <div class="text-white/70 text-xs mb-1"><i class="fas fa-sun mr-1"></i>Sun</div>
+                    <div class="text-white">
+                        <span class="text-yellow-400 text-xs">↑</span> <span class="text-sm font-semibold">${data.daily.sunrise && data.daily.sunrise[i] ? formatTime12Hour(new Date(data.daily.sunrise[i])) : 'N/A'}</span>
+                    </div>
+                    <div class="text-white mt-0.5">
+                        <span class="text-orange-400 text-xs">↓</span> <span class="text-sm font-semibold">${data.daily.sunset && data.daily.sunset[i] ? formatTime12Hour(new Date(data.daily.sunset[i])) : 'N/A'}</span>
                     </div>
                 </div>
             </div>
