@@ -15,6 +15,18 @@
     <meta property="og:type" content="website">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        window.MathJax = {
+            tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+            chtml: { scale: 0.9 },
+            startup: {
+                ready: () => {
+                    MathJax.startup.defaultReady();
+                }
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
         tailwind.config = {
             theme: {
                 extend: {
@@ -235,6 +247,25 @@
             background: rgba(75, 85, 99, 0.7);
             border-color: rgba(107, 114, 128, 0.6);
         }
+        
+        /* MathJax formula containers */
+        .formula-container {
+            background: rgba(31, 41, 55, 0.5);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .formula-container mjx-container {
+            max-width: 100% !important;
+        }
+        
+        @media (max-width: 640px) {
+            .formula-container {
+                padding: 0.75rem 0.5rem;
+                font-size: 0.85em;
+            }
+        }
     </style>
 </head>
 <body class="text-white p-4 md:p-8">
@@ -369,7 +400,7 @@
                         <div id="pressureStatus" class="text-gray-500 text-xs"></div>
                     </div>
                     <div class="stat-card rounded-xl p-4">
-                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-moon text-purple-400 mr-1"></i>Moon</div>
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-moon text-purple-400 mr-1"></i>Moon <i class="fas fa-info-circle text-xs ml-1"></i></div>
                         <div id="moonPhase" class="flex items-center gap-2">
                             <span id="moonPhaseEmoji" class="text-xl"></span>
                             <span id="moonPhaseName" class="text-xs font-semibold text-white"></span>
@@ -379,6 +410,16 @@
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-lungs text-green-400 mr-1"></i>Air Quality</div>
                         <div id="aqiValue" class="text-xl font-bold text-white"></div>
                         <div id="aqiStatus" class="text-gray-500 text-xs"></div>
+                    </div>
+                    <div id="sinusRiskSection" class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="openSymptomRiskModal('sinus')">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-head-side-cough text-blue-300 mr-1"></i>Sinus <i class="fas fa-info-circle text-xs ml-1"></i></div>
+                        <div id="sinusRiskValue" class="text-2xl font-bold text-white"></div>
+                        <div id="sinusRiskLabel" class="text-xs mt-1"></div>
+                    </div>
+                    <div id="allergyRiskSection" class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="openSymptomRiskModal('allergy')">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-seedling text-green-300 mr-1"></i>Allergy <i class="fas fa-info-circle text-xs ml-1"></i></div>
+                        <div id="allergyRiskValue" class="text-2xl font-bold text-white"></div>
+                        <div id="allergyRiskLabel" class="text-xs mt-1"></div>
                     </div>
                 </div>
             </section>
@@ -400,6 +441,52 @@
                 </h3>
                 <div id="weeklySnowContent" class="space-y-2">
                     <!-- Snow totals will be inserted here -->
+                </div>
+            </section>
+
+            <!-- Pollen Forecast -->
+            <section id="pollenSection" class="hidden card rounded-2xl p-6 md:p-8 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <span class="text-2xl">🌿</span> Pollen Forecast
+                </h3>
+                
+                <!-- Current Pollen Levels -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-400 mb-3">Current Levels</h4>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="stat-card rounded-xl p-4 text-center">
+                            <div class="text-gray-400 text-xs mb-1"><i class="fas fa-tree text-green-400 mr-1"></i>Tree</div>
+                            <div id="pollenTreeValue" class="text-xl font-bold text-white"></div>
+                            <div id="pollenTreeLabel" class="text-xs mt-1"></div>
+                        </div>
+                        <div class="stat-card rounded-xl p-4 text-center">
+                            <div class="text-gray-400 text-xs mb-1"><i class="fas fa-leaf text-lime-400 mr-1"></i>Grass</div>
+                            <div id="pollenGrassValue" class="text-xl font-bold text-white"></div>
+                            <div id="pollenGrassLabel" class="text-xs mt-1"></div>
+                        </div>
+                        <div class="stat-card rounded-xl p-4 text-center">
+                            <div class="text-gray-400 text-xs mb-1"><i class="fas fa-seedling text-amber-400 mr-1"></i>Weed</div>
+                            <div id="pollenWeedValue" class="text-xl font-bold text-white"></div>
+                            <div id="pollenWeedLabel" class="text-xs mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 5-Day Pollen Forecast -->
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-400 mb-3">5-Day Forecast</h4>
+                    <div id="pollenForecast" class="space-y-2">
+                        <!-- Forecast items will be inserted here -->
+                    </div>
+                </div>
+                
+                <!-- Pollen Types Legend -->
+                <div class="mt-4 pt-4 border-t border-gray-600/30">
+                    <p class="text-gray-500 text-xs">
+                        <i class="fas fa-tree text-green-400 mr-1"></i><strong>Tree:</strong> Alder, Birch, Olive &nbsp;|&nbsp;
+                        <i class="fas fa-leaf text-lime-400 mr-1"></i><strong>Grass:</strong> General &nbsp;|&nbsp;
+                        <i class="fas fa-seedling text-amber-400 mr-1"></i><strong>Weed:</strong> Mugwort, Ragweed
+                    </p>
                 </div>
             </section>
 
@@ -591,6 +678,155 @@
                         <div id="nextNewMoon" class="text-2xl font-bold text-white"></div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Symptom Risk Details Modal -->
+    <div id="symptomRiskModal" class="modal">
+        <div class="modal-content p-6 md:p-8 max-w-3xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="symptomRiskModalTitle" class="text-2xl font-bold text-white flex items-center gap-2">
+                    <span class="text-3xl" id="symptomRiskModalIcon"></span>
+                    <span id="symptomRiskModalTitleText"></span>
+                </h2>
+                <button id="closeSymptomRiskModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Current Values Section -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-white mb-3">Current Values</h3>
+                <div id="symptomCurrentValues" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Formula Section -->
+            <div class="space-y-6">
+                <div id="sinusFormulaSection" class="hidden">
+                    <h3 class="text-lg font-semibold text-white mb-3"><i class="fas fa-head-side-cough text-blue-300 mr-2"></i>Sinus Risk Calculation</h3>
+                    <div class="stat-card rounded-xl p-5 space-y-4">
+                        <p class="text-gray-300 text-sm mb-4">
+                            Sinus symptoms are often triggered by rapid barometric pressure changes, high humidity, and temperature fluctuations. 
+                            This index aggregates key meteorological factors associated with sinus discomfort.
+                        </p>
+                        
+                        <div class="formula-container">
+                            <div class="text-white">
+                                \[ \text{Sinus Risk} = \sum \text{(Factors)} \]
+                            </div>
+                        </div>
+                        
+                        <h4 class="text-white font-semibold mt-4">Factor Scoring:</h4>
+                        
+                        <div class="space-y-3">
+                            <div class="stat-card rounded-lg p-3">
+                                <div class="text-blue-300 font-semibold mb-2"><i class="fas fa-tachometer-alt mr-2"></i>Pressure Change (inHg)</div>
+                                <div class="text-gray-300 text-sm mb-2">Day-over-day barometric pressure change:</div>
+                                <div class="formula-container">
+                                    \[ \Delta P = P_{\text{today}} - P_{\text{yesterday}} \]
+                                </div>
+                                <ul class="text-gray-400 text-sm mt-2 space-y-1">
+                                    <li>• \(\Delta P < -0.30\) inHg → <span class="text-red-400 font-semibold">+5 points</span> (severe drop)</li>
+                                    <li>• \(-0.30 \leq \Delta P < -0.18\) inHg → <span class="text-orange-400 font-semibold">+3 points</span></li>
+                                    <li>• \(-0.18 \leq \Delta P < -0.10\) inHg → <span class="text-yellow-400 font-semibold">+2 points</span></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="stat-card rounded-lg p-3">
+                                <div class="text-blue-300 font-semibold mb-2"><i class="fas fa-tint mr-2"></i>Humidity</div>
+                                <div class="text-gray-400 text-sm">
+                                    • Humidity \(> 70\%\) → <span class="text-yellow-400 font-semibold">+1 point</span>
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card rounded-lg p-3">
+                                <div class="text-blue-300 font-semibold mb-2"><i class="fas fa-cloud-rain mr-2"></i>Precipitation</div>
+                                <div class="text-gray-400 text-sm">
+                                    • Precipitation \(> 0.1\) in → <span class="text-yellow-400 font-semibold">+1 point</span>
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card rounded-lg p-3">
+                                <div class="text-blue-300 font-semibold mb-2"><i class="fas fa-thermometer-half mr-2"></i>Temperature Swing</div>
+                                <div class="text-gray-300 text-sm mb-2">Daily high-low difference:</div>
+                                <div class="formula-container">
+                                    \[ \Delta T = T_{\max} - T_{\min} \]
+                                </div>
+                                <div class="text-gray-400 text-sm mt-2">
+                                    • \(\Delta T > 20°F\) → <span class="text-yellow-400 font-semibold">+1 point</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="allergyFormulaSection" class="hidden">
+                    <h3 class="text-lg font-semibold text-white mb-3"><i class="fas fa-seedling text-green-300 mr-2"></i>Allergy Risk Calculation</h3>
+                    <div class="stat-card rounded-xl p-5 space-y-4">
+                        <p class="text-gray-300 text-sm mb-4">
+                            This calculation uses real pollen data from Open-Meteo, measuring actual pollen counts (grains/m³) for tree, grass, and weed pollen to provide accurate allergy risk assessment.
+                        </p>
+                        
+                        <div class="formula-container">
+                            <div class="text-white">
+                                \[ \text{Allergy Risk} = \sum \text{(Factors)} \]
+                            </div>
+                        </div>
+                        
+                        <h4 class="text-white font-semibold mt-4">Factor Scoring:</h4>
+                        <div class="space-y-3 mt-3">
+                            <div class="stat-card rounded-lg p-3">
+                                <div class="text-green-300 font-semibold mb-2"><i class="fas fa-leaf mr-2"></i>Pollen Count (max of Tree/Grass/Weed)</div>
+                                <ul class="text-gray-400 text-sm space-y-1">
+                                    <li>• \(P > 200\) grains/m³ (Very High) → <span class="text-red-400 font-semibold">+5 points</span></li>
+                                    <li>• \(80 < P \leq 200\) grains/m³ (High) → <span class="text-orange-400 font-semibold">+4 points</span></li>
+                                    <li>• \(20 < P \leq 80\) grains/m³ (Moderate) → <span class="text-yellow-400 font-semibold">+2 points</span></li>
+                                    <li>• \(0 < P \leq 20\) grains/m³ (Low) → <span class="text-green-400 font-semibold">+1 point</span></li>
+                                </ul>
+                            </div>
+                            <div class="stat-card rounded-lg p-3">
+                                <div class="text-green-300 font-semibold mb-2"><i class="fas fa-wind mr-2"></i>Wind (disperses pollen)</div>
+                                <div class="text-gray-400 text-sm">• Wind \(> 10\) mph → <span class="text-yellow-400 font-semibold">+2 points</span></div>
+                            </div>
+                            <div class="stat-card rounded-lg p-3">
+                                <div class="text-green-300 font-semibold mb-2"><i class="fas fa-cloud-rain mr-2"></i>Rain Washout</div>
+                                <div class="text-gray-400 text-sm">• Precipitation \(> 0.1\) in → <span class="text-green-400 font-semibold">−2 points</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Risk Level Legend -->
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold text-white mb-3">Risk Level Scale</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="stat-card rounded-lg p-3 text-center">
+                            <div class="text-green-400 font-bold text-xl">0-2</div>
+                            <div class="text-gray-400 text-sm">Low</div>
+                        </div>
+                        <div class="stat-card rounded-lg p-3 text-center">
+                            <div class="text-yellow-400 font-bold text-xl">3-4</div>
+                            <div class="text-gray-400 text-sm">Moderate</div>
+                        </div>
+                        <div class="stat-card rounded-lg p-3 text-center">
+                            <div class="text-orange-400 font-bold text-xl">5-7</div>
+                            <div class="text-gray-400 text-sm">High</div>
+                        </div>
+                        <div class="stat-card rounded-lg p-3 text-center">
+                            <div class="text-red-400 font-bold text-xl">8-10</div>
+                            <div class="text-gray-400 text-sm">Very High</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <p class="text-gray-500 text-xs mt-4 text-center">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    These indices are estimates based on meteorological data and general associations. 
+                    Individual sensitivity may vary. Consult a healthcare provider for medical advice.
+                </p>
             </div>
         </div>
     </div>
