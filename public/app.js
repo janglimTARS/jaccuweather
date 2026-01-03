@@ -7,6 +7,12 @@ let hourlyChart = null;
 let dailyChart = null;
 // Layer switching removed - Ventusky handles layers internally
 
+// Format units from API (e.g., "mp/h" -> "mph")
+function formatUnit(unit) {
+    if (!unit) return '';
+    return unit.replace('mp/h', 'mph');
+}
+
 // Favorites management using IndexedDB (more persistent than localStorage)
 let favoritesDB = null;
 
@@ -576,7 +582,7 @@ function displayWeather(data) {
         document.getElementById('dewPoint').textContent = `${Math.round(data.current.dewpoint_2m)}${data.current_units.dewpoint_2m}`;
     }
     
-    document.getElementById('windSpeed').textContent = `${data.current.wind_speed_10m} ${data.current_units.wind_speed_10m}`;
+    document.getElementById('windSpeed').textContent = `${data.current.wind_speed_10m} ${formatUnit(data.current_units.wind_speed_10m)}`;
     document.getElementById('uvIndex').textContent = data.current.uv_index;
     
     // Pressure with trend
@@ -634,7 +640,7 @@ function displayWeather(data) {
             <div class="text-white/70 text-sm mb-1">${formatTime12Hour(hour)}</div>
             <div class="text-2xl mb-2">${getWeatherIcon(data.hourly.weather_code[hourIndex])}</div>
             <div class="text-white font-bold text-lg">${Math.round(data.hourly.temperature_2m[hourIndex])}${data.hourly_units.temperature_2m}</div>
-            <div class="text-white/60 text-xs mt-1">${data.hourly.wind_speed_10m[hourIndex]} ${data.hourly_units.wind_speed_10m}</div>
+            <div class="text-white/60 text-xs mt-1">${data.hourly.wind_speed_10m[hourIndex]} ${formatUnit(data.hourly_units.wind_speed_10m)}</div>
         `;
         hourItem.addEventListener('click', () => openHourlyModal(data));
         hourlyContainer.appendChild(hourItem);
@@ -669,7 +675,7 @@ function displayWeather(data) {
                     ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[i] || 0} ${data.daily_units.precipitation_sum}</div>`}
                     ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[i]} ${data.daily_units.snowfall_sum || 'in'}</div>` : ''}
                     ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[i] !== null && data.daily.precipitation_probability_max[i] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[i]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[i] !== null && data.daily.precipitation_probability_max[i] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[i]}%</div>` : '')}
-                    <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[i]} ${data.daily_units.wind_speed_10m_max}</div>
+                    <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[i]} ${formatUnit(data.daily_units.wind_speed_10m_max)}</div>
                 </div>
             </div>
         `;
@@ -1536,7 +1542,7 @@ function openHourlyModal(data) {
             data: {
                 labels,
                 datasets: [{
-                    label: `Wind Speed (${data.hourly_units.wind_speed_10m})`,
+                    label: `Wind Speed (${formatUnit(data.hourly_units.wind_speed_10m)})`,
                     data: wind,
                     borderColor: 'rgb(255, 206, 86)',
                     backgroundColor: 'rgba(255, 206, 86, 0.2)',
@@ -1614,7 +1620,7 @@ function openHourlyModal(data) {
             <div class="grid grid-cols-2 gap-2 text-sm">
                 <div><span class="text-white/70">Temp:</span> <span class="text-white font-bold">${Math.round(temps[i])}${data.hourly_units.temperature_2m}</span></div>
                 <div><span class="text-white/70">Condition:</span> <span class="text-white">${getWeatherDescription(data.hourly.weather_code[idx])}</span></div>
-                <div><span class="text-white/70">Wind:</span> <span class="text-white">${wind[i]} ${data.hourly_units.wind_speed_10m}</span></div>
+                <div><span class="text-white/70">Wind:</span> <span class="text-white">${wind[i]} ${formatUnit(data.hourly_units.wind_speed_10m)}</span></div>
                 <div><span class="text-white/70">Humidity:</span> <span class="text-white">${humidity[i]}${data.hourly_units.relative_humidity_2m}</span></div>
                 ${pressure[i] ? `<div><span class="text-white/70">Pressure:</span> <span class="text-white">${pressure[i]}" inHg</span></div>` : ''}
                 ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation ? `<div><span class="text-white/70">Precip:</span> <span class="text-white">${precip[i]} ${data.hourly_units.precipitation || 'in'}</span>${data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined ? ` <span class="text-white/60">(${data.hourly.precipitation_probability[idx]}%)</span>` : ''}</div>` : '')}
@@ -1740,7 +1746,7 @@ function openDailyModal(data) {
             data: {
                 labels,
                 datasets: [{
-                    label: `Wind Speed (${data.daily_units.wind_speed_10m_max})`,
+                    label: `Wind Speed (${formatUnit(data.daily_units.wind_speed_10m_max)})`,
                     data: wind,
                     borderColor: 'rgb(255, 206, 86)',
                     backgroundColor: 'rgba(255, 206, 86, 0.2)',
@@ -1878,7 +1884,7 @@ function openDailyModal(data) {
                 `}
                 <div class="bg-white/10 rounded p-3">
                     <div class="text-white/70 text-xs mb-1">Wind Speed</div>
-                    <div class="text-white font-bold">${wind[i]} ${data.daily_units.wind_speed_10m_max}</div>
+                    <div class="text-white font-bold">${wind[i]} ${formatUnit(data.daily_units.wind_speed_10m_max)}</div>
                 </div>
                 ${dailyPressure[i] ? `
                 <div class="bg-white/10 rounded p-3">
