@@ -455,7 +455,7 @@ async function fetchWeather(lat, lon) {
 
     try {
         // Make direct request to Open-Meteo from browser (uses user's IP, not shared Cloudflare IP)
-        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
 
         // Check for rate limiting before parsing JSON
         if (weatherResponse.status === 429) {
@@ -610,6 +610,66 @@ function displayWeather(data) {
     if (moonPhaseCard) {
         moonPhaseCard.style.cursor = 'pointer';
         moonPhaseCard.addEventListener('click', () => openMoonDetailsModal(today));
+    }
+
+    // Calculate and display symptom risks
+    if (data.hourly && data.hourly.surface_pressure) {
+        // Get today's date and yesterday's date
+        const todayDate = new Date();
+        const yesterdayDate = new Date(todayDate);
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        
+        // Calculate daily averages for today and yesterday
+        const todayAvg = calculateDailyAverages(data.hourly, todayDate);
+        const yesterdayAvg = calculateDailyAverages(data.hourly, yesterdayDate);
+        
+        if (todayAvg) {
+            // Calculate pressure change (today - yesterday)
+            const pressureChange = yesterdayAvg ? 
+                (todayAvg.avgPressureInhg - yesterdayAvg.avgPressureInhg) : 0;
+            
+            // Get temperature swing from daily data (today is at index 2 due to past_days=2)
+            const todayIndex = 2;
+            const tempSwing = data.daily.temperature_2m_max[todayIndex] - 
+                             data.daily.temperature_2m_min[todayIndex];
+            
+            // Store symptom data for modal display
+            currentSymptomData = {
+                pressureChange: pressureChange,
+                humidity: todayAvg.avgHumidity,
+                precipitation: todayAvg.precipSum,
+                tempSwing: tempSwing,
+                avgTemp: todayAvg.avgTemp,
+                windMax: todayAvg.windMax
+            };
+            
+            // Calculate risks
+            const sinusRisk = calculateSinusRisk(
+                pressureChange, 
+                todayAvg.avgHumidity, 
+                todayAvg.precipSum, 
+                tempSwing
+            );
+            
+            // Initial allergy risk - will be updated when pollen data arrives
+            const allergyRisk = calculateAllergyRisk(
+                todayAvg.windMax, 
+                todayAvg.precipSum,
+                currentPollenData
+            );
+            
+            // Display sinus risk
+            const sinusLabel = getRiskLabel(sinusRisk);
+            document.getElementById('sinusRiskValue').textContent = `${sinusRisk}/10`;
+            document.getElementById('sinusRiskLabel').textContent = sinusLabel.label;
+            document.getElementById('sinusRiskLabel').className = `text-xs font-semibold ${sinusLabel.colorClass}`;
+            
+            // Display allergy risk
+            const allergyLabel = getRiskLabel(allergyRisk);
+            document.getElementById('allergyRiskValue').textContent = `${allergyRisk}/10`;
+            document.getElementById('allergyRiskLabel').textContent = allergyLabel.label;
+            document.getElementById('allergyRiskLabel').className = `text-xs font-semibold ${allergyLabel.colorClass}`;
+        }
     }
     
     // Precipitation timing
@@ -1376,14 +1436,18 @@ function displayAlerts(alerts) {
 }
 
 // Air Quality functionality
+// Store pollen data globally for use in allergy risk calculation
+let currentPollenData = null;
+
 async function fetchAirQuality(lat, lon) {
     try {
-        // Fetch air quality data from Open-Meteo Air Quality API
-        const aqiResponse = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide`);
+        // Fetch air quality data from Open-Meteo Air Quality API including pollen
+        const aqiResponse = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen&hourly=alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen&forecast_days=5&timezone=auto`);
         
         if (!aqiResponse.ok) {
-            // Hide air quality section if API is unavailable
+            // Hide air quality and pollen sections if API is unavailable
             document.getElementById('airQualitySection').classList.add('hidden');
+            document.getElementById('pollenSection').classList.add('hidden');
             return;
         }
         
@@ -1391,13 +1455,22 @@ async function fetchAirQuality(lat, lon) {
         
         if (aqiData.error || !aqiData.current) {
             document.getElementById('airQualitySection').classList.add('hidden');
+            document.getElementById('pollenSection').classList.add('hidden');
             return;
         }
         
+        // Store pollen data for allergy risk calculation
+        currentPollenData = aqiData;
+        
         displayAirQuality(aqiData.current);
+        displayPollenData(aqiData);
+        
+        // Recalculate allergy risk with real pollen data
+        updateAllergyRiskWithPollenData();
     } catch (error) {
         console.error('Error fetching air quality:', error);
         document.getElementById('airQualitySection').classList.add('hidden');
+        document.getElementById('pollenSection').classList.add('hidden');
     }
 }
 
@@ -1439,6 +1512,434 @@ function displayAirQuality(data) {
     aqiValue.className = `text-2xl font-bold ${color}`;
     aqiStatus.textContent = category;
     aqiStatus.className = `text-white/90 text-xs mt-1 ${color}`;
+}
+
+// ============================================
+// Symptom Risk Calculation Functions
+// ============================================
+
+// Store symptom data globally for modal display
+let currentSymptomData = null;
+
+// Convert hPa to inHg (inches of mercury)
+function hpaToInhg(hpa) {
+    return hpa * 0.02953;
+}
+
+// Calculate daily averages from hourly data for a specific date
+function calculateDailyAverages(hourlyData, targetDate) {
+    const targetDateStr = targetDate.toISOString().split('T')[0];
+    let tempSum = 0, humiditySum = 0, pressureSum = 0, precipSum = 0;
+    let windMax = 0, count = 0;
+    
+    for (let i = 0; i < hourlyData.time.length; i++) {
+        const hourDate = hourlyData.time[i].split('T')[0];
+        if (hourDate === targetDateStr) {
+            tempSum += hourlyData.temperature_2m[i] || 0;
+            humiditySum += hourlyData.relative_humidity_2m[i] || 0;
+            pressureSum += hourlyData.surface_pressure ? (hourlyData.surface_pressure[i] || 0) : 0;
+            precipSum += hourlyData.precipitation ? (hourlyData.precipitation[i] || 0) : 0;
+            windMax = Math.max(windMax, hourlyData.wind_speed_10m[i] || 0);
+            count++;
+        }
+    }
+    
+    if (count === 0) return null;
+    
+    return {
+        avgTemp: tempSum / count,
+        avgHumidity: humiditySum / count,
+        avgPressureInhg: hpaToInhg(pressureSum / count),
+        precipSum: precipSum,
+        windMax: windMax
+    };
+}
+
+// Calculate sinus risk score (0-10)
+function calculateSinusRisk(pressureChange, humidity, precipitation, tempSwing) {
+    let risk = 0;
+    
+    // Pressure drop scoring
+    if (pressureChange < -0.30) {
+        risk += 5;
+    } else if (pressureChange >= -0.30 && pressureChange < -0.18) {
+        risk += 3;
+    } else if (pressureChange >= -0.18 && pressureChange < -0.10) {
+        risk += 2;
+    }
+    
+    // High humidity
+    if (humidity > 70) {
+        risk += 1;
+    }
+    
+    // Precipitation
+    if (precipitation > 0.1) {
+        risk += 1;
+    }
+    
+    // Temperature swing
+    if (tempSwing > 20) {
+        risk += 1;
+    }
+    
+    // Clip to 0-10
+    return Math.max(0, Math.min(10, risk));
+}
+
+// Calculate allergy risk score (0-10) - requires pollen data
+function calculateAllergyRisk(windMax, precipitation, pollenData = null) {
+    // Requires pollen data - returns 0 if unavailable
+    if (!pollenData || !pollenData.current) {
+        return 0;
+    }
+    
+    let risk = 0;
+    const current = pollenData.current;
+    
+    // Get max pollen levels
+    const treePollen = Math.max(
+        current.alder_pollen || 0,
+        current.birch_pollen || 0,
+        current.olive_pollen || 0
+    );
+    const grassPollen = current.grass_pollen || 0;
+    const weedPollen = Math.max(
+        current.mugwort_pollen || 0,
+        current.ragweed_pollen || 0
+    );
+    const maxPollen = Math.max(treePollen, grassPollen, weedPollen);
+    
+    // Score based on actual pollen levels (grains/m³)
+    if (maxPollen > 200) {
+        risk += 5;  // Very High pollen
+    } else if (maxPollen > 80) {
+        risk += 4;  // High pollen
+    } else if (maxPollen > 20) {
+        risk += 2;  // Moderate pollen
+    } else if (maxPollen > 0) {
+        risk += 1;  // Low pollen
+    }
+    
+    // Wind disperses pollen
+    if (windMax > 10) {
+        risk += 2;
+    }
+    
+    // Wet day reduces risk (rain washes pollen away)
+    if (precipitation > 0.1) {
+        risk -= 2;
+    }
+    
+    // Clip to 0-10
+    return Math.max(0, Math.min(10, risk));
+}
+
+// Get risk level label and color class
+function getRiskLabel(risk) {
+    if (risk <= 2) {
+        return { label: 'Low', colorClass: 'text-green-400' };
+    } else if (risk <= 4) {
+        return { label: 'Moderate', colorClass: 'text-yellow-400' };
+    } else if (risk <= 7) {
+        return { label: 'High', colorClass: 'text-orange-400' };
+    } else {
+        return { label: 'Very High', colorClass: 'text-red-400' };
+    }
+}
+
+// Update allergy risk calculation when pollen data becomes available
+function updateAllergyRiskWithPollenData() {
+    if (!currentSymptomData || !currentPollenData) return;
+    
+    // Recalculate allergy risk with real pollen data
+    const allergyRisk = calculateAllergyRisk(
+        currentSymptomData.windMax,
+        currentSymptomData.precipitation,
+        currentPollenData
+    );
+    
+    // Update display
+    const allergyLabel = getRiskLabel(allergyRisk);
+    document.getElementById('allergyRiskValue').textContent = `${allergyRisk}/10`;
+    document.getElementById('allergyRiskLabel').textContent = allergyLabel.label;
+    document.getElementById('allergyRiskLabel').className = `text-xs font-semibold ${allergyLabel.colorClass}`;
+}
+
+// ============================================
+// Pollen Display Functions
+// ============================================
+
+// Get pollen level category based on grains/m³
+function getPollenLevel(value) {
+    if (value === null || value === undefined || value === 0) {
+        return { label: 'None', colorClass: 'text-gray-400', level: 0 };
+    } else if (value <= 20) {
+        return { label: 'Low', colorClass: 'text-green-400', level: 1 };
+    } else if (value <= 80) {
+        return { label: 'Moderate', colorClass: 'text-yellow-400', level: 2 };
+    } else if (value <= 200) {
+        return { label: 'High', colorClass: 'text-orange-400', level: 3 };
+    } else {
+        return { label: 'Very High', colorClass: 'text-red-400', level: 4 };
+    }
+}
+
+// Display pollen data
+function displayPollenData(aqiData) {
+    const pollenSection = document.getElementById('pollenSection');
+    
+    if (!aqiData.current) {
+        pollenSection.classList.add('hidden');
+        return;
+    }
+    
+    const current = aqiData.current;
+    
+    // Calculate combined values for each category
+    const treePollen = Math.max(
+        current.alder_pollen || 0,
+        current.birch_pollen || 0,
+        current.olive_pollen || 0
+    );
+    const grassPollen = current.grass_pollen || 0;
+    const weedPollen = Math.max(
+        current.mugwort_pollen || 0,
+        current.ragweed_pollen || 0
+    );
+    
+    // Check if any pollen data is available
+    if (treePollen === 0 && grassPollen === 0 && weedPollen === 0) {
+        const hasAnyData = [
+            current.alder_pollen, current.birch_pollen, current.olive_pollen,
+            current.grass_pollen, current.mugwort_pollen, current.ragweed_pollen
+        ].some(v => v !== null && v !== undefined);
+        
+        if (!hasAnyData) {
+            pollenSection.classList.add('hidden');
+            return;
+        }
+    }
+    
+    pollenSection.classList.remove('hidden');
+    
+    // Display current tree pollen
+    const treeLevel = getPollenLevel(treePollen);
+    document.getElementById('pollenTreeValue').textContent = Math.round(treePollen);
+    document.getElementById('pollenTreeLabel').textContent = treeLevel.label;
+    document.getElementById('pollenTreeLabel').className = `text-xs mt-1 font-semibold ${treeLevel.colorClass}`;
+    
+    // Display current grass pollen
+    const grassLevel = getPollenLevel(grassPollen);
+    document.getElementById('pollenGrassValue').textContent = Math.round(grassPollen);
+    document.getElementById('pollenGrassLabel').textContent = grassLevel.label;
+    document.getElementById('pollenGrassLabel').className = `text-xs mt-1 font-semibold ${grassLevel.colorClass}`;
+    
+    // Display current weed pollen
+    const weedLevel = getPollenLevel(weedPollen);
+    document.getElementById('pollenWeedValue').textContent = Math.round(weedPollen);
+    document.getElementById('pollenWeedLabel').textContent = weedLevel.label;
+    document.getElementById('pollenWeedLabel').className = `text-xs mt-1 font-semibold ${weedLevel.colorClass}`;
+    
+    // Display 5-day forecast
+    if (aqiData.hourly && aqiData.hourly.time) {
+        displayPollenForecast(aqiData.hourly);
+    }
+}
+
+// Display pollen forecast
+function displayPollenForecast(hourlyData) {
+    const forecastContainer = document.getElementById('pollenForecast');
+    forecastContainer.innerHTML = '';
+    
+    // Group hourly data by day and get daily max
+    const dailyData = {};
+    
+    for (let i = 0; i < hourlyData.time.length; i++) {
+        const date = hourlyData.time[i].split('T')[0];
+        
+        if (!dailyData[date]) {
+            dailyData[date] = { tree: 0, grass: 0, weed: 0 };
+        }
+        
+        dailyData[date].tree = Math.max(
+            dailyData[date].tree,
+            hourlyData.alder_pollen?.[i] || 0,
+            hourlyData.birch_pollen?.[i] || 0,
+            hourlyData.olive_pollen?.[i] || 0
+        );
+        dailyData[date].grass = Math.max(
+            dailyData[date].grass,
+            hourlyData.grass_pollen?.[i] || 0
+        );
+        dailyData[date].weed = Math.max(
+            dailyData[date].weed,
+            hourlyData.mugwort_pollen?.[i] || 0,
+            hourlyData.ragweed_pollen?.[i] || 0
+        );
+    }
+    
+    const dates = Object.keys(dailyData).slice(0, 5);
+    const isMobile = window.innerWidth <= 768;
+    
+    dates.forEach((dateStr, index) => {
+        const day = parseDateString(dateStr);
+        const data = dailyData[dateStr];
+        
+        const treeLevel = getPollenLevel(data.tree);
+        const grassLevel = getPollenLevel(data.grass);
+        const weedLevel = getPollenLevel(data.weed);
+        
+        const overallLevel = Math.max(treeLevel.level, grassLevel.level, weedLevel.level);
+        
+        const forecastItem = document.createElement('div');
+        forecastItem.className = 'stat-card rounded-xl p-4 flex items-center justify-between';
+        
+        const dayName = index === 0 ? 'Today' : 
+                       index === 1 ? 'Tomorrow' : 
+                       day.toLocaleDateString('en-US', { weekday: isMobile ? 'short' : 'long' });
+        const dateDisplay = day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        forecastItem.innerHTML = `
+            <div class="flex items-center gap-3">
+                <div class="text-2xl">${getPollenEmoji(overallLevel)}</div>
+                <div>
+                    <div class="text-white font-semibold">${dayName}</div>
+                    <div class="text-gray-400 text-xs">${dateDisplay}</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <div class="text-center">
+                    <div class="text-gray-500 text-xs mb-1">Tree</div>
+                    <div class="${treeLevel.colorClass} font-semibold">${treeLevel.label}</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-gray-500 text-xs mb-1">Grass</div>
+                    <div class="${grassLevel.colorClass} font-semibold">${grassLevel.label}</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-gray-500 text-xs mb-1">Weed</div>
+                    <div class="${weedLevel.colorClass} font-semibold">${weedLevel.label}</div>
+                </div>
+            </div>
+        `;
+        
+        forecastContainer.appendChild(forecastItem);
+    });
+}
+
+// Get emoji based on pollen level
+function getPollenEmoji(level) {
+    switch(level) {
+        case 0: return '😊';
+        case 1: return '🙂';
+        case 2: return '😐';
+        case 3: return '😷';
+        case 4: return '🤧';
+        default: return '🌿';
+    }
+}
+
+// ============================================
+// Symptom Risk Modal
+// ============================================
+
+function openSymptomRiskModal(type) {
+    const modal = document.getElementById('symptomRiskModal');
+    const titleText = document.getElementById('symptomRiskModalTitleText');
+    const titleIcon = document.getElementById('symptomRiskModalIcon');
+    const sinusSection = document.getElementById('sinusFormulaSection');
+    const allergySection = document.getElementById('allergyFormulaSection');
+    const currentValuesContainer = document.getElementById('symptomCurrentValues');
+    
+    if (type === 'sinus') {
+        titleText.textContent = 'Sinus Risk Methodology';
+        titleIcon.innerHTML = '<i class="fas fa-head-side-cough text-blue-300"></i>';
+        sinusSection.classList.remove('hidden');
+        allergySection.classList.add('hidden');
+    } else {
+        titleText.textContent = 'Allergy Risk Methodology';
+        titleIcon.innerHTML = '<i class="fas fa-seedling text-green-300"></i>';
+        sinusSection.classList.add('hidden');
+        allergySection.classList.remove('hidden');
+    }
+    
+    // Populate current values if available
+    if (currentSymptomData) {
+        const data = currentSymptomData;
+        
+        if (type === 'sinus') {
+            currentValuesContainer.innerHTML = `
+                <div class="stat-card rounded-lg p-3 text-center">
+                    <div class="text-gray-400 text-xs mb-1">Pressure Change</div>
+                    <div class="text-white font-bold">${data.pressureChange >= 0 ? '+' : ''}${data.pressureChange.toFixed(2)} inHg</div>
+                </div>
+                <div class="stat-card rounded-lg p-3 text-center">
+                    <div class="text-gray-400 text-xs mb-1">Humidity</div>
+                    <div class="text-white font-bold">${data.humidity.toFixed(0)}%</div>
+                </div>
+                <div class="stat-card rounded-lg p-3 text-center">
+                    <div class="text-gray-400 text-xs mb-1">Precipitation</div>
+                    <div class="text-white font-bold">${data.precipitation.toFixed(2)} in</div>
+                </div>
+                <div class="stat-card rounded-lg p-3 text-center">
+                    <div class="text-gray-400 text-xs mb-1">Temp Swing</div>
+                    <div class="text-white font-bold">${data.tempSwing.toFixed(1)}°F</div>
+                </div>
+            `;
+        } else {
+            // Check if we have pollen data
+            let pollenHtml = '';
+            if (currentPollenData && currentPollenData.current) {
+                const pollen = currentPollenData.current;
+                const treePollen = Math.max(pollen.alder_pollen || 0, pollen.birch_pollen || 0, pollen.olive_pollen || 0);
+                const grassPollen = pollen.grass_pollen || 0;
+                const weedPollen = Math.max(pollen.mugwort_pollen || 0, pollen.ragweed_pollen || 0);
+                const treeLevel = getPollenLevel(treePollen);
+                const grassLevel = getPollenLevel(grassPollen);
+                const weedLevel = getPollenLevel(weedPollen);
+                
+                pollenHtml = `
+                    <div class="stat-card rounded-lg p-3 text-center">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-tree text-green-400 mr-1"></i>Tree Pollen</div>
+                        <div class="text-white font-bold">${Math.round(treePollen)}</div>
+                        <div class="text-xs ${treeLevel.colorClass}">${treeLevel.label}</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3 text-center">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-leaf text-lime-400 mr-1"></i>Grass Pollen</div>
+                        <div class="text-white font-bold">${Math.round(grassPollen)}</div>
+                        <div class="text-xs ${grassLevel.colorClass}">${grassLevel.label}</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3 text-center">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-seedling text-amber-400 mr-1"></i>Weed Pollen</div>
+                        <div class="text-white font-bold">${Math.round(weedPollen)}</div>
+                        <div class="text-xs ${weedLevel.colorClass}">${weedLevel.label}</div>
+                    </div>
+                `;
+            }
+            
+            currentValuesContainer.innerHTML = `
+                ${pollenHtml}
+                <div class="stat-card rounded-lg p-3 text-center">
+                    <div class="text-gray-400 text-xs mb-1">Max Wind</div>
+                    <div class="text-white font-bold">${data.windMax.toFixed(1)} mph</div>
+                </div>
+                <div class="stat-card rounded-lg p-3 text-center">
+                    <div class="text-gray-400 text-xs mb-1">Precipitation</div>
+                    <div class="text-white font-bold">${data.precipitation.toFixed(2)} in</div>
+                </div>
+            `;
+        }
+    }
+    
+    modal.classList.add('active');
+    
+    // Re-render MathJax for the newly visible content
+    if (window.MathJax) {
+        MathJax.typesetPromise([modal]).catch(function (err) {
+            console.log('MathJax typeset error:', err);
+        });
+    }
 }
 
 // Chart selector functionality
@@ -1973,6 +2474,10 @@ document.getElementById('closeMoonDetailsModal').addEventListener('click', () =>
     document.getElementById('moonDetailsModal').classList.remove('active');
 });
 
+document.getElementById('closeSymptomRiskModal').addEventListener('click', () => {
+    document.getElementById('symptomRiskModal').classList.remove('active');
+});
+
 // Close modals when clicking outside
 document.getElementById('hourlyModal').addEventListener('click', (e) => {
     if (e.target.id === 'hourlyModal') {
@@ -1992,12 +2497,19 @@ document.getElementById('moonDetailsModal').addEventListener('click', (e) => {
     }
 });
 
+document.getElementById('symptomRiskModal').addEventListener('click', (e) => {
+    if (e.target.id === 'symptomRiskModal') {
+        document.getElementById('symptomRiskModal').classList.remove('active');
+    }
+});
+
 // Close modals with Escape key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         document.getElementById('hourlyModal').classList.remove('active');
         document.getElementById('dailyModal').classList.remove('active');
         document.getElementById('moonDetailsModal').classList.remove('active');
+        document.getElementById('symptomRiskModal').classList.remove('active');
     }
 });
 
