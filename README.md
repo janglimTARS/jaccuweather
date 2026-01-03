@@ -1,6 +1,6 @@
 # Jaccuweather
 
-A fully featured, modern weather website built as a Cloudflare Worker. Jaccuweather provides real-time weather forecasts, interactive radar maps, and detailed meteorological data using the Open-Meteo API and Ventusky for radar visualization.
+A fully featured, modern weather website built as a Cloudflare Worker. Jaccuweather provides real-time weather forecasts, interactive radar maps, health-focused symptom risk forecasting, and detailed meteorological data using the Open-Meteo API and Ventusky for radar visualization.
 
 ## 🌟 Features
 
@@ -11,6 +11,12 @@ A fully featured, modern weather website built as a Cloudflare Worker. Jaccuweat
 - ❄️ **Weekly Snow Totals** - Displays cumulative snowfall predictions for the week when snow is in the forecast
 - 🌙 **Moon Phase Data** - Comprehensive moon phase information including illumination, moonrise/moonset times, distance, and next full/new moon dates
 - 📊 **Interactive Charts** - Visual temperature, precipitation, wind, and moon phase charts for extended forecasts
+
+### Health & Wellness Features
+- 🤧 **Sinus Risk Forecasting** - Calculates risk of sinus discomfort based on barometric pressure changes, humidity, precipitation, and temperature swings
+- 🌿 **Allergy Risk Forecasting** - Estimates pollen allergy risk using real pollen count data (tree, grass, weed) from Open-Meteo Air Quality API
+- 🏥 **Pollen Forecast** - Current pollen levels and 5-day pollen forecast with detailed breakdowns by pollen type
+- 📋 **Health Methodology** - Detailed calculation formulas with LaTeX mathematical expressions for complete transparency
 
 ### Location Features
 - 🔍 **Location Search** - Search for any city or location worldwide with autocomplete
@@ -48,9 +54,10 @@ A fully featured, modern weather website built as a Cloudflare Worker. Jaccuweat
 
 ### Backend & Infrastructure
 - **Cloudflare Workers** - Serverless deployment platform for edge computing
-- **Open-Meteo API** - Free, open-source weather API for forecast data
+- **Open-Meteo API** - Free, open-source weather API for forecast data and air quality/pollen information
 - **Ventusky** - Interactive weather maps and radar visualization
 - **BigDataCloud API** - Reverse geocoding service (free tier)
+- **MathJax** - LaTeX mathematical rendering for formula display
 
 ### Development Tools
 - **Wrangler** - Cloudflare Workers CLI for development and deployment
@@ -139,6 +146,7 @@ The Cloudflare Worker provides the following endpoints:
 - `/api/forecast` - Proxies requests to Open-Meteo forecast API
 - `/api/geocoding` - Proxies requests to Open-Meteo geocoding API
 - `/api/reverse` - Proxies requests to BigDataCloud reverse geocoding API
+- `/api/air-quality` - Proxies requests to Open-Meteo Air Quality API (includes pollen data)
 - `/ventusky-proxy/*` - Proxies Ventusky requests with desktop user agent to avoid mobile app prompts
 
 ## 📋 Features in Detail
@@ -178,6 +186,35 @@ The Cloudflare Worker provides the following endpoints:
 - **Quick Access**: Dropdown menu for quick location switching
 - **Local Storage**: Favorites persist across browser sessions
 - **Remove Favorites**: Easy removal of saved locations
+
+### Health & Wellness Features
+
+#### Sinus Risk Forecasting
+- **Risk Calculation**: Estimates sinus discomfort risk based on meteorological factors that commonly trigger sinus symptoms
+- **Factors Considered**:
+  - Barometric pressure changes (sudden drops can cause sinus pressure)
+  - High humidity levels (>70%)
+  - Precipitation events
+  - Temperature swings (>20°F daily change)
+- **Risk Levels**: Low (0-2), Moderate (3-4), High (5-7), Very High (8-10)
+- **Methodology Modal**: Click the Sinus tile to see detailed calculation formulas with LaTeX mathematical expressions
+
+#### Allergy Risk Forecasting
+- **Pollen-Based Calculation**: Uses real pollen count data from Open-Meteo Air Quality API for accurate allergy risk assessment
+- **Pollen Types Tracked**: Tree pollen (Alder, Birch, Olive), Grass pollen, Weed pollen (Mugwort, Ragweed)
+- **Risk Scoring**:
+  - Very High: >200 grains/m³
+  - High: 80-200 grains/m³
+  - Moderate: 20-80 grains/m³
+  - Low: 1-20 grains/m³
+- **Additional Factors**: Wind speed (disperses pollen) and recent precipitation (washes pollen away)
+- **Transparent Methodology**: Click the Allergy tile for detailed formulas and pollen level thresholds
+
+#### Pollen Forecast Section
+- **Current Levels**: Real-time pollen counts for Tree, Grass, and Weed categories with color-coded severity indicators
+- **5-Day Forecast**: Daily maximum pollen levels with emoji indicators and category breakdowns
+- **Data Source**: Open-Meteo Air Quality API (free, no API key required)
+- **Health Insights**: Helps users with pollen allergies plan activities and medication
 
 ### Moon Phase Features
 - **Current Moon Phase**: Displays today's moon phase with emoji and name in the current weather section
@@ -353,8 +390,10 @@ MIT License - feel free to use this project for personal or commercial purposes.
 ## 🙏 Credits
 
 - **Weather Data**: [Open-Meteo](https://open-meteo.com/) - Free, open-source weather API
+- **Air Quality & Pollen Data**: [Open-Meteo Air Quality API](https://air-quality-api.open-meteo.com/) - Real-time pollen and air quality data
 - **Weather Maps**: [Ventusky](https://www.ventusky.com/) - Interactive weather visualization
 - **Moon Calculations**: [SunCalc.js](https://github.com/mourner/suncalc) - Accurate astronomical calculations for moon phases and times
+- **Mathematical Rendering**: [MathJax](https://www.mathjax.org/) - LaTeX mathematical expression rendering
 - **Icons**: [Font Awesome](https://fontawesome.com/) - Icon library
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
 - **Charts**: [Chart.js](https://www.chartjs.org/) - JavaScript charting library
