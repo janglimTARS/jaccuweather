@@ -578,7 +578,10 @@ function displayWeather(data) {
     if (data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[2] !== undefined) {
         const todayHigh = Math.round(data.daily.temperature_2m_max[2]);
         const todayLow = Math.round(data.daily.temperature_2m_min[2]);
-        document.getElementById('currentHighLow').textContent = `H:${todayHigh}° L:${todayLow}°`;
+        // Use compact format for mobile, full format for desktop
+        const isMobile = window.innerWidth <= 768;
+        document.getElementById('currentHighLow').textContent = isMobile ?
+            `${todayHigh}°/${todayLow}°` : `H:${todayHigh}° L:${todayLow}°`;
     }
 
     document.getElementById('currentCondition').textContent = getWeatherDescription(data.current.weather_code);
