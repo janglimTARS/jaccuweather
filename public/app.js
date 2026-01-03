@@ -573,6 +573,14 @@ function displayWeather(data) {
     document.getElementById('lastUpdated').textContent = `Updated ${formatLastUpdated(new Date())}`;
     
     document.getElementById('currentTemp').textContent = `${Math.round(data.current.temperature_2m)}${data.current_units.temperature_2m}`;
+
+    // Display today's high/low temperatures (index 2 because of past_days=2)
+    if (data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[2] !== undefined) {
+        const todayHigh = Math.round(data.daily.temperature_2m_max[2]);
+        const todayLow = Math.round(data.daily.temperature_2m_min[2]);
+        document.getElementById('currentHighLow').textContent = `H:${todayHigh}° L:${todayLow}°`;
+    }
+
     document.getElementById('currentCondition').textContent = getWeatherDescription(data.current.weather_code);
     document.getElementById('feelsLike').textContent = `${Math.round(data.current.apparent_temperature)}${data.current_units.apparent_temperature}`;
     document.getElementById('humidity').textContent = `${data.current.relative_humidity_2m}${data.current_units.relative_humidity_2m}`;
