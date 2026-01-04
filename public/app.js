@@ -691,19 +691,26 @@ function displayWeather(data) {
     hourlyContainer.innerHTML = '';
     const now = new Date();
     const currentHour = now.getHours();
-    
-    // Find the closest hour in the data (skip past days due to past_days=2)
-    // With past_days=2, we have 3 days of data, so skip the first 2 days (48 hours)
-    const hoursPerDay = 24;
-    const pastDays = 2;
-    const skipHours = pastDays * hoursPerDay; // 48 hours to skip
 
-    let startIndex = skipHours; // Start from today's data
-    for (let i = skipHours; i < data.hourly.time.length; i++) {
+    // Find today's data in the hourly forecast (skip past days due to past_days=2)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0); // Set to start of today
+
+    let startIndex = 0;
+    // Find the first hour of today
+    for (let i = 0; i < data.hourly.time.length; i++) {
         const hourTime = new Date(data.hourly.time[i]);
-        if (hourTime.getHours() >= currentHour) {
-            startIndex = i;
-            break;
+        hourTime.setHours(0, 0, 0, 0); // Set to start of that day
+        if (hourTime.getTime() >= todayStart.getTime()) {
+            // Found today's data, now find the closest hour to current time
+            for (let j = i; j < data.hourly.time.length; j++) {
+                const currentHourTime = new Date(data.hourly.time[j]);
+                if (currentHourTime.getHours() >= currentHour) {
+                    startIndex = j;
+                    break;
+                }
+            }
+            if (startIndex > 0) break; // Found it
         }
     }
     
@@ -2007,17 +2014,25 @@ function openHourlyModal(data) {
     const now = new Date();
     const currentHour = now.getHours();
 
-    // Skip past days due to past_days=2 (48 hours to skip)
-    const hoursPerDay = 24;
-    const pastDays = 2;
-    const skipHours = pastDays * hoursPerDay; // 48 hours to skip
+    // Find today's data in the hourly forecast (skip past days due to past_days=2)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0); // Set to start of today
 
-    let startIndex = skipHours; // Start from today's data
-    for (let i = skipHours; i < data.hourly.time.length; i++) {
+    let startIndex = 0;
+    // Find the first hour of today
+    for (let i = 0; i < data.hourly.time.length; i++) {
         const hourTime = new Date(data.hourly.time[i]);
-        if (hourTime.getHours() >= currentHour) {
-            startIndex = i;
-            break;
+        hourTime.setHours(0, 0, 0, 0); // Set to start of that day
+        if (hourTime.getTime() >= todayStart.getTime()) {
+            // Found today's data, now find the closest hour to current time
+            for (let j = i; j < data.hourly.time.length; j++) {
+                const currentHourTime = new Date(data.hourly.time[j]);
+                if (currentHourTime.getHours() >= currentHour) {
+                    startIndex = j;
+                    break;
+                }
+            }
+            if (startIndex > 0) break; // Found it
         }
     }
     
