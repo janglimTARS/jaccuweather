@@ -725,13 +725,15 @@ function displayWeather(data) {
     const isMobile = window.innerWidth <= 768;
     const weekdayFormat = isMobile ? 'short' : 'long';
     
-    for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
-        const day = parseDateString(data.daily.time[i]);
+    // Start from index 2 to skip past 2 days due to past_days=2
+    for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
+        const dayIndex = i + 2; // Skip past days
+        const day = parseDateString(data.daily.time[dayIndex]);
         const dayItem = document.createElement('div');
         dayItem.className = 'flex items-center justify-between bg-white/10 rounded-lg p-4 backdrop-blur-sm clickable';
         dayItem.innerHTML = `
             <div class="flex items-center gap-4">
-                <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[i])}</div>
+                <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex])}</div>
                 <div>
                     <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
                     <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
@@ -739,14 +741,14 @@ function displayWeather(data) {
             </div>
             <div class="flex items-center gap-6">
                 <div class="text-right">
-                    <div class="text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[i])}${data.daily_units.temperature_2m_max}</div>
-                    <div class="text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[i])}${data.daily_units.temperature_2m_min}</div>
+                    <div class="text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[dayIndex])}${data.daily_units.temperature_2m_max}</div>
+                    <div class="text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[dayIndex])}${data.daily_units.temperature_2m_min}</div>
                 </div>
                 <div class="text-white/70 text-sm text-right min-w-[100px]">
-                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[i] || 0} ${data.daily_units.precipitation_sum}</div>`}
-                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[i]} ${data.daily_units.snowfall_sum || 'in'}</div>` : ''}
-                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[i] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[i] !== null && data.daily.precipitation_probability_max[i] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[i]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[i] !== null && data.daily.precipitation_probability_max[i] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[i]}%</div>` : '')}
-                    <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[i]} ${formatUnit(data.daily_units.wind_speed_10m_max)}</div>
+                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[dayIndex] || 0} ${data.daily_units.precipitation_sum}</div>`}
+                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[dayIndex]} ${data.daily_units.snowfall_sum || 'in'}</div>` : ''}
+                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '')}
+                    <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[dayIndex]} ${formatUnit(data.daily_units.wind_speed_10m_max)}</div>
                 </div>
             </div>
         `;
@@ -784,10 +786,12 @@ function displayWeeklySnowTotals(data) {
     const isMobile = window.innerWidth <= 768;
     const weekdayFormat = isMobile ? 'short' : 'long';
     
-    for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
-        const snowfall = data.daily.snowfall_sum[i] || 0;
+    // Start from index 2 to skip past 2 days due to past_days=2
+    for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
+        const dayIndex = i + 2; // Skip past days
+        const snowfall = data.daily.snowfall_sum[dayIndex] || 0;
         if (snowfall > 0) {
-            const day = parseDateString(data.daily.time[i]);
+            const day = parseDateString(data.daily.time[dayIndex]);
             const dayName = day.toLocaleDateString('en-US', { weekday: weekdayFormat });
             const dateStr = day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             // Round to nearest 0.1 inch
@@ -2199,15 +2203,17 @@ function openDailyModal(data) {
     const moonPhases = [];
     const dailyPressure = [];
     
-    for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
-        const day = parseDateString(data.daily.time[i]);
+    // Start from index 2 to skip past 2 days due to past_days=2
+    for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
+        const dayIndex = i + 2; // Skip past days
+        const day = parseDateString(data.daily.time[dayIndex]);
         labels.push(day.toLocaleDateString('en-US', { weekday: 'short' }));
-        maxTemps.push(Math.round(data.daily.temperature_2m_max[i]));
-        minTemps.push(Math.round(data.daily.temperature_2m_min[i]));
-        precip.push(data.daily.precipitation_sum[i] || 0);
-        snowfall.push(data.daily.snowfall_sum ? data.daily.snowfall_sum[i] || 0 : 0);
-        wind.push(data.daily.wind_speed_10m_max[i]);
-        precipProb.push(data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[i] : 0);
+        maxTemps.push(Math.round(data.daily.temperature_2m_max[dayIndex]));
+        minTemps.push(Math.round(data.daily.temperature_2m_min[dayIndex]));
+        precip.push(data.daily.precipitation_sum[dayIndex] || 0);
+        snowfall.push(data.daily.snowfall_sum ? data.daily.snowfall_sum[dayIndex] || 0 : 0);
+        wind.push(data.daily.wind_speed_10m_max[dayIndex]);
+        precipProb.push(data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : 0);
         moonPhases.push(calculateMoonPhase(day));
         
         // Calculate daily average pressure from hourly data (noon value for each day)
@@ -2394,8 +2400,10 @@ function openDailyModal(data) {
     // Populate detailed daily items
     const detailsContainer = document.getElementById('dailyDetails');
     detailsContainer.innerHTML = '';
-    for (let i = 0; i < Math.min(14, data.daily.time.length); i++) {
-        const day = parseDateString(data.daily.time[i]);
+    // Start from index 2 to skip past 2 days due to past_days=2
+    for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
+        const dayIndex = i + 2; // Skip past days
+        const day = parseDateString(data.daily.time[dayIndex]);
         const moonPhaseValue = calculateMoonPhase(day);
         const moonPhase = getMoonPhase(moonPhaseValue);
         const detailItem = document.createElement('div');
@@ -2406,7 +2414,7 @@ function openDailyModal(data) {
                     <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: 'long' })}</div>
                     <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
                 </div>
-                <div class="text-4xl">${getWeatherIcon(data.daily.weather_code[i])}</div>
+                <div class="text-4xl">${getWeatherIcon(data.daily.weather_code[dayIndex])}</div>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div class="bg-white/10 rounded p-3">
@@ -2453,7 +2461,7 @@ function openDailyModal(data) {
                     </div>
                 </div>
             </div>
-            <div class="mt-3 text-white/80">${getWeatherDescription(data.daily.weather_code[i])}</div>
+            <div class="mt-3 text-white/80">${getWeatherDescription(data.daily.weather_code[dayIndex])}</div>
         `;
         
         // Add click handler for moon phase card in modal
