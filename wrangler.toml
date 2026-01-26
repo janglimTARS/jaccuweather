@@ -5,3 +5,8 @@ compatibility_date = "2024-01-01"
 # Secrets (set using: wrangler secret put TOMORROW_API_KEY)
 # TOMORROW_API_KEY - No longer needed, using NWS instead (NWS doesn't require API keys)
 
+# Test/Staging environment - deploy here first to preview changes
+# URL: weather-app-test.<your-subdomain>.workers.dev
+[env.test]
+name = "weather-app-test"
+

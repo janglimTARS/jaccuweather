@@ -6,7 +6,10 @@
   "scripts": {
     "build": "node build.js",
     "dev": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy"
+    "dev:test": "npm run build && wrangler dev --env test",
+    "deploy:test": "npm run build && wrangler deploy --env test",
+    "deploy": "npm run build && wrangler deploy",
+    "promote": "npm run build && wrangler deploy --env test && wrangler deploy"
   },
   "keywords": [
     "weather",

@@ -41,7 +41,39 @@ jaccuweather/
 npm install          # Install dependencies (first time only)
 npm run build        # Build worker file (generates src/index.js)
 npm run dev          # Build + start local dev server (http://localhost:8787)
-npm run deploy       # Build + deploy to Cloudflare Workers
+npm run dev:test     # Build + start local dev server (test env)
+npm run deploy:test  # Build + deploy to TEST environment
+npm run deploy       # Build + deploy to PRODUCTION
+npm run promote      # Deploy to both test and production
+```
+
+## Test/Staging Workflow
+
+The project has a **test environment** for previewing changes before going to production:
+
+| Environment | Worker Name | URL |
+|-------------|-------------|-----|
+| Test | `weather-app-test` | `weather-app-test.<subdomain>.workers.dev` |
+| Production | `weather-app` | `weather-app.<subdomain>.workers.dev` |
+
+### Recommended Workflow
+1. Make changes to files in `public/`
+2. Test locally: `npm run dev`
+3. Deploy to test: `npm run deploy:test`
+4. Preview at test URL and verify changes
+5. If good, deploy to production: `npm run deploy`
+6. If bad, revert changes and redeploy test
+
+### Quick Commands
+```bash
+# Preview changes on test site
+npm run deploy:test
+
+# Push to production after testing
+npm run deploy
+
+# Deploy to both at once (after confirming test is good)
+npm run promote
 ```
 
 ## Architecture
