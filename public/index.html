@@ -357,6 +357,10 @@
                         <h2 id="currentLocation" class="text-2xl md:text-3xl font-bold text-white mb-2"></h2>
                         <p id="currentDate" class="text-gray-400"></p>
                         <p id="lastUpdated" class="text-gray-500 text-xs mt-1"></p>
+                        <button onclick="generateWeatherReport()" class="mt-3 text-sm bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg transition-all flex items-center gap-2">
+                            <i class="fas fa-microphone"></i>
+                            <span>Weather Report</span>
+                        </button>
                     </div>
                     <div class="text-left md:text-right mt-4 md:mt-0">
                         <div class="flex flex-col md:flex-row md:items-end md:justify-end md:gap-3">
@@ -368,21 +372,21 @@
                 </div>
                 
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
-                    <div class="stat-card rounded-xl p-4">
-                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-thermometer-half text-orange-400 mr-1"></i>Feels Like</div>
+                    <div class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="showMetricInfo('feelsLike')">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-thermometer-half text-orange-400 mr-1"></i>Feels Like <i class="fas fa-question-circle text-xs ml-1 opacity-50"></i></div>
                         <div id="feelsLike" class="text-xl font-bold text-white"></div>
                     </div>
-                    <div class="stat-card rounded-xl p-4">
-                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-tint text-blue-400 mr-1"></i>Humidity</div>
+                    <div class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="showMetricInfo('humidity')">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-tint text-blue-400 mr-1"></i>Humidity <i class="fas fa-question-circle text-xs ml-1 opacity-50"></i></div>
                         <div id="humidity" class="text-xl font-bold text-white"></div>
                         <div class="text-gray-500 text-xs mt-1">Dew: <span id="dewPoint" class="text-gray-300">--</span></div>
                     </div>
-                    <div class="stat-card rounded-xl p-4">
-                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-wind text-cyan-400 mr-1"></i>Wind</div>
+                    <div class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="showMetricInfo('wind')">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-wind text-cyan-400 mr-1"></i>Wind <i class="fas fa-question-circle text-xs ml-1 opacity-50"></i></div>
                         <div id="windSpeed" class="text-xl font-bold text-white"></div>
                     </div>
-                    <div class="stat-card rounded-xl p-4">
-                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-sun text-yellow-400 mr-1"></i>UV Index</div>
+                    <div class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="showMetricInfo('uvIndex')">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-sun text-yellow-400 mr-1"></i>UV Index <i class="fas fa-question-circle text-xs ml-1 opacity-50"></i></div>
                         <div id="uvIndex" class="text-xl font-bold text-white"></div>
                     </div>
                     <div class="stat-card rounded-xl p-4">
@@ -394,16 +398,16 @@
                             <span class="text-orange-400 text-xs">↓</span> <span id="sunset" class="text-sm font-semibold">--</span>
                         </div>
                     </div>
-                    <div class="stat-card rounded-xl p-4">
-                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-gauge text-green-400 mr-1"></i>Pressure</div>
+                    <div class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="showMetricInfo('pressure')">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-gauge text-green-400 mr-1"></i>Pressure <i class="fas fa-question-circle text-xs ml-1 opacity-50"></i></div>
                         <div class="flex items-center gap-1">
                             <span id="pressure" class="text-xl font-bold text-white">--</span>
                             <span id="pressureTrend" class="text-sm"></span>
                         </div>
                         <div id="pressureStatus" class="text-gray-500 text-xs"></div>
                     </div>
-                    <div class="stat-card rounded-xl p-4">
-                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-moon text-purple-400 mr-1"></i>Moon <i class="fas fa-info-circle text-xs ml-1"></i></div>
+                    <div class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="openMoonDetailsModal()">
+                        <div class="text-gray-400 text-xs mb-1"><i class="fas fa-moon text-purple-400 mr-1"></i>Moon <i class="fas fa-info-circle text-xs ml-1 opacity-50"></i></div>
                         <div id="moonPhase" class="flex items-center gap-2">
                             <span id="moonPhaseEmoji" class="text-xl"></span>
                             <span id="moonPhaseName" class="text-xs font-semibold text-white"></span>
@@ -490,6 +494,143 @@
                         <i class="fas fa-leaf text-lime-400 mr-1"></i><strong>Grass:</strong> General &nbsp;|&nbsp;
                         <i class="fas fa-seedling text-amber-400 mr-1"></i><strong>Weed:</strong> Mugwort, Ragweed
                     </p>
+                </div>
+            </section>
+
+            <!-- Cloud Coverage & Sky Visibility -->
+            <section id="skySection" class="card rounded-2xl p-6 md:p-8 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <span class="text-2xl">☁️</span> Cloud Coverage & Sky Visibility
+                    <button onclick="openSkyMethodologyModal()" class="text-gray-400 hover:text-white ml-2">
+                        <i class="fas fa-question-circle text-sm"></i>
+                    </button>
+                </h3>
+
+                <!-- Current Cloud Coverage -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-400 mb-3">Current Conditions</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="stat-card rounded-xl p-4 text-center">
+                            <div class="text-gray-400 text-xs mb-1"><i class="fas fa-cloud text-gray-300 mr-1"></i>Total Cover</div>
+                            <div id="cloudCoverTotal" class="text-2xl font-bold text-white">--%</div>
+                            <div id="cloudCoverDesc" class="text-xs text-gray-400 mt-1"></div>
+                        </div>
+                        <div class="stat-card rounded-xl p-4 text-center">
+                            <div class="text-gray-400 text-xs mb-1"><i class="fas fa-cloud text-blue-200 mr-1"></i>High (>6km)</div>
+                            <div id="cloudCoverHigh" class="text-xl font-bold text-white">--%</div>
+                            <div class="text-xs text-gray-500">Cirrus, Cirrostratus</div>
+                        </div>
+                        <div class="stat-card rounded-xl p-4 text-center">
+                            <div class="text-gray-400 text-xs mb-1"><i class="fas fa-cloud text-gray-400 mr-1"></i>Mid (2-6km)</div>
+                            <div id="cloudCoverMid" class="text-xl font-bold text-white">--%</div>
+                            <div class="text-xs text-gray-500">Altocumulus, Altostratus</div>
+                        </div>
+                        <div class="stat-card rounded-xl p-4 text-center">
+                            <div class="text-gray-400 text-xs mb-1"><i class="fas fa-cloud text-gray-500 mr-1"></i>Low (<2km)</div>
+                            <div id="cloudCoverLow" class="text-xl font-bold text-white">--%</div>
+                            <div class="text-xs text-gray-500">Cumulus, Stratus</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nighttime Sky Visibility -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-400 mb-3">Tonight's Stargazing Conditions</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="stat-card rounded-xl p-4">
+                            <div class="text-gray-400 text-xs mb-2"><i class="fas fa-star text-yellow-300 mr-1"></i>Sky Quality</div>
+                            <div class="flex items-center gap-3">
+                                <div id="skyQualityValue" class="text-3xl font-bold text-white"></div>
+                                <div>
+                                    <div id="skyQualityLabel" class="text-sm font-semibold"></div>
+                                    <div id="skyQualityMag" class="text-xs text-gray-400"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card rounded-xl p-4">
+                            <div class="text-gray-400 text-xs mb-2"><i class="fas fa-eye text-cyan-300 mr-1"></i>Visibility</div>
+                            <div id="visibilityValue" class="text-2xl font-bold text-white"></div>
+                            <div id="visibilityDesc" class="text-xs text-gray-400 mt-1"></div>
+                        </div>
+                        <div class="stat-card rounded-xl p-4">
+                            <div class="text-gray-400 text-xs mb-2"><i class="fas fa-lightbulb text-amber-300 mr-1"></i>Light Pollution</div>
+                            <div id="lightPollutionValue" class="text-2xl font-bold text-white"></div>
+                            <div id="lightPollutionDesc" class="text-xs text-gray-400 mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 24-Hour Cloud Forecast -->
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold text-gray-400 mb-3">24-Hour Cloud Forecast</h4>
+                    <div id="cloudForecast" class="overflow-x-auto">
+                        <div class="flex gap-2 min-w-max pb-2">
+                            <!-- Cloud forecast items will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expandable Science Section -->
+                <div class="border-t border-gray-600/30 pt-4">
+                    <button onclick="toggleScienceSection('cloudScience')" class="flex items-center gap-2 text-gray-400 hover:text-white transition-colors w-full text-left">
+                        <i id="cloudScienceToggle" class="fas fa-chevron-right text-xs transition-transform"></i>
+                        <span class="text-sm font-semibold"><i class="fas fa-flask mr-2"></i>Science Corner: Atmospheric Optics</span>
+                    </button>
+                    <div id="cloudScienceContent" class="hidden mt-4 space-y-4">
+                        <div class="stat-card rounded-xl p-4">
+                            <h5 class="text-white font-semibold mb-2"><i class="fas fa-cloud text-blue-300 mr-2"></i>Why Different Cloud Layers Matter</h5>
+                            <p class="text-gray-400 text-sm mb-3">
+                                Clouds form at different altitudes based on temperature and humidity profiles in the atmosphere.
+                                Each layer has distinct characteristics:
+                            </p>
+                            <ul class="text-gray-400 text-sm space-y-2 ml-4">
+                                <li><strong class="text-blue-200">High clouds (Cirrus family):</strong> Made of ice crystals, thin and wispy. They can create halos around the sun/moon and often indicate approaching weather fronts.</li>
+                                <li><strong class="text-gray-300">Mid clouds (Alto family):</strong> Mix of water droplets and ice. A gray Altostratus layer often brings steady rain within 12-24 hours.</li>
+                                <li><strong class="text-gray-400">Low clouds (Stratus/Cumulus):</strong> Dense water droplets. Stratus creates overcast skies; Cumulus indicates convective activity.</li>
+                            </ul>
+                        </div>
+                        <div class="stat-card rounded-xl p-4">
+                            <h5 class="text-white font-semibold mb-2"><i class="fas fa-star text-yellow-300 mr-2"></i>Limiting Magnitude Explained</h5>
+                            <p class="text-gray-400 text-sm mb-3">
+                                Astronomers use <strong>apparent magnitude</strong> to measure brightness. Counterintuitively, <em>lower numbers are brighter</em>.
+                            </p>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mt-2">
+                                <div class="stat-card rounded-lg p-2 text-center">
+                                    <div class="text-yellow-400 font-bold">-26.7</div>
+                                    <div class="text-gray-500">Sun</div>
+                                </div>
+                                <div class="stat-card rounded-lg p-2 text-center">
+                                    <div class="text-gray-300 font-bold">-12.7</div>
+                                    <div class="text-gray-500">Full Moon</div>
+                                </div>
+                                <div class="stat-card rounded-lg p-2 text-center">
+                                    <div class="text-white font-bold">-4.4</div>
+                                    <div class="text-gray-500">Venus (max)</div>
+                                </div>
+                                <div class="stat-card rounded-lg p-2 text-center">
+                                    <div class="text-cyan-400 font-bold">+6.5</div>
+                                    <div class="text-gray-500">Naked eye limit</div>
+                                </div>
+                            </div>
+                            <p class="text-gray-500 text-xs mt-3">
+                                The faintest stars visible to the naked eye are around magnitude +6.5 under perfect dark sky conditions.
+                                Light pollution, clouds, and moonlight all reduce this limit.
+                            </p>
+                        </div>
+                        <div class="stat-card rounded-xl p-4">
+                            <h5 class="text-white font-semibold mb-2"><i class="fas fa-lightbulb text-amber-300 mr-2"></i>The Bortle Dark-Sky Scale</h5>
+                            <p class="text-gray-400 text-sm mb-3">
+                                The Bortle scale rates night sky darkness from 1 (pristine) to 9 (inner city):
+                            </p>
+                            <div class="space-y-1 text-xs">
+                                <div class="flex items-center gap-2"><span class="w-6 h-3 bg-gray-900 rounded"></span><span class="text-gray-300">Class 1-2: Milky Way casts shadows, zodiacal light visible</span></div>
+                                <div class="flex items-center gap-2"><span class="w-6 h-3 bg-gray-800 rounded"></span><span class="text-gray-300">Class 3-4: Rural skies, Milky Way still impressive</span></div>
+                                <div class="flex items-center gap-2"><span class="w-6 h-3 bg-gray-600 rounded"></span><span class="text-gray-300">Class 5-6: Suburban, Milky Way washed out near horizon</span></div>
+                                <div class="flex items-center gap-2"><span class="w-6 h-3 bg-gray-400 rounded"></span><span class="text-gray-300">Class 7-8: Suburban/urban transition, Milky Way barely visible</span></div>
+                                <div class="flex items-center gap-2"><span class="w-6 h-3 bg-orange-200 rounded"></span><span class="text-gray-300">Class 9: Inner city, only bright planets visible</span></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -834,8 +975,168 @@
         </div>
     </div>
 
+    <!-- Weather Report Modal -->
+    <div id="weatherReportModal" class="modal">
+        <div class="modal-content p-6 md:p-8 max-w-3xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                    <span class="text-3xl">🎙️</span> Weather Report
+                </h2>
+                <div class="flex items-center gap-3">
+                    <button id="toggleSpeechBtn" onclick="toggleSpeech()" class="text-gray-400 hover:text-white text-xl transition-colors" title="Toggle speech">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <button id="closeWeatherReportModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Report Header -->
+            <div class="text-center mb-6">
+                <div id="reportLocationName" class="text-xl font-bold text-white"></div>
+                <div id="reportDateTime" class="text-gray-400 text-sm"></div>
+            </div>
+
+            <!-- Teleprompter-style Report -->
+            <div class="stat-card rounded-xl p-6 mb-6 min-h-[300px]">
+                <div id="reportContent" class="text-gray-200 text-lg leading-relaxed space-y-4">
+                    <!-- Report paragraphs will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Quick Stats Summary -->
+            <div id="reportStats" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <!-- Stats will be inserted here -->
+            </div>
+
+            <!-- Speech Controls -->
+            <div class="mt-6 flex justify-center gap-4">
+                <button onclick="restartReport()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-redo mr-2"></i>Restart
+                </button>
+                <button onclick="closeWeatherReport()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-check mr-2"></i>Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metric Info Modal -->
+    <div id="metricInfoModal" class="modal">
+        <div class="modal-content p-6 md:p-8 max-w-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="metricInfoTitle" class="text-2xl font-bold text-white flex items-center gap-2">
+                    <span id="metricInfoIcon" class="text-3xl"></span>
+                    <span id="metricInfoTitleText"></span>
+                </h2>
+                <button id="closeMetricInfoModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="metricInfoContent" class="space-y-4">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Sky Methodology Modal -->
+    <div id="skyMethodologyModal" class="modal">
+        <div class="modal-content p-6 md:p-8 max-w-3xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                    <span class="text-3xl">☁️</span> Cloud & Sky Visibility Methodology
+                </h2>
+                <button id="closeSkyMethodologyModal" class="text-gray-400 hover:text-white text-2xl transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Cloud Coverage Explanation -->
+                <div class="stat-card rounded-xl p-5">
+                    <h3 class="text-lg font-semibold text-white mb-3"><i class="fas fa-cloud text-gray-300 mr-2"></i>Cloud Coverage by Altitude</h3>
+                    <p class="text-gray-300 text-sm mb-4">
+                        Clouds are categorized by altitude, each with different characteristics and effects on visibility:
+                    </p>
+                    <div class="space-y-3">
+                        <div class="stat-card rounded-lg p-3">
+                            <div class="text-blue-200 font-semibold mb-1"><i class="fas fa-cloud mr-2"></i>High Clouds (>6 km / 20,000 ft)</div>
+                            <div class="text-gray-400 text-sm">
+                                <strong>Cirrus, Cirrostratus, Cirrocumulus</strong> - Thin, wispy ice crystal clouds. Often allow dim stars through but scatter moonlight. Minimal impact on bright star visibility.
+                            </div>
+                        </div>
+                        <div class="stat-card rounded-lg p-3">
+                            <div class="text-gray-300 font-semibold mb-1"><i class="fas fa-cloud mr-2"></i>Mid Clouds (2-6 km / 6,500-20,000 ft)</div>
+                            <div class="text-gray-400 text-sm">
+                                <strong>Altocumulus, Altostratus</strong> - Moderate opacity. Can significantly obscure stars. Altostratus often produces a "watery" sun/moon effect.
+                            </div>
+                        </div>
+                        <div class="stat-card rounded-lg p-3">
+                            <div class="text-gray-400 font-semibold mb-1"><i class="fas fa-cloud mr-2"></i>Low Clouds (<2 km / 6,500 ft)</div>
+                            <div class="text-gray-400 text-sm">
+                                <strong>Cumulus, Stratus, Stratocumulus</strong> - Dense water droplet clouds. Block almost all starlight. However, can be patchy allowing clear windows.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sky Quality Calculation -->
+                <div class="stat-card rounded-xl p-5">
+                    <h3 class="text-lg font-semibold text-white mb-3"><i class="fas fa-star text-yellow-300 mr-2"></i>Sky Quality Calculation</h3>
+                    <p class="text-gray-300 text-sm mb-4">
+                        The stargazing quality rating combines multiple factors to estimate naked-eye limiting magnitude (NELM):
+                    </p>
+                    <div class="formula-container mb-4">
+                        <div class="text-white text-sm">
+                            \[ \text{Sky Score} = \text{Base} - \text{Cloud Penalty} - \text{Moon Penalty} - \text{Light Pollution} \]
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-gray-400 text-sm">
+                        <p><strong>Base Score:</strong> 10 (perfect dark sky conditions)</p>
+                        <p><strong>Cloud Penalty:</strong> Up to -5 based on weighted cloud coverage (low clouds penalized most)</p>
+                        <p><strong>Moon Penalty:</strong> Up to -3 based on illumination percentage</p>
+                        <p><strong>Light Pollution:</strong> -1 to -4 based on location (estimated from population density)</p>
+                    </div>
+                </div>
+
+                <!-- Limiting Magnitude -->
+                <div class="stat-card rounded-xl p-5">
+                    <h3 class="text-lg font-semibold text-white mb-3"><i class="fas fa-eye text-cyan-300 mr-2"></i>Limiting Magnitude Scale</h3>
+                    <p class="text-gray-300 text-sm mb-4">
+                        Limiting magnitude indicates the faintest stars visible to the naked eye. Lower numbers = brighter objects only.
+                    </p>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-sm">
+                        <div class="stat-card rounded-lg p-2">
+                            <div class="text-red-400 font-bold">mag 2-3</div>
+                            <div class="text-gray-500 text-xs">Urban sky</div>
+                        </div>
+                        <div class="stat-card rounded-lg p-2">
+                            <div class="text-yellow-400 font-bold">mag 4-5</div>
+                            <div class="text-gray-500 text-xs">Suburban</div>
+                        </div>
+                        <div class="stat-card rounded-lg p-2">
+                            <div class="text-green-400 font-bold">mag 5-6</div>
+                            <div class="text-gray-500 text-xs">Rural</div>
+                        </div>
+                        <div class="stat-card rounded-lg p-2">
+                            <div class="text-cyan-400 font-bold">mag 6.5+</div>
+                            <div class="text-gray-500 text-xs">Dark site</div>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-gray-500 text-xs mt-4 text-center">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Light pollution estimates are approximate and based on general location data.
+                    Actual conditions may vary based on local factors.
+                </p>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
-    
+
     <!-- Footer -->
     <footer class="text-center mt-8 mb-4 py-4 border-t border-gray-700/50">
         <p class="text-gray-500 text-sm">Vibecoded with <span class="text-gray-500">❤️</span> by Jack A</p>

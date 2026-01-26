@@ -455,7 +455,7 @@ async function fetchWeather(lat, lon) {
 
     try {
         // Make direct request to Open-Meteo from browser (uses user's IP, not shared Cloudflare IP)
-        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure,cloud_cover&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
 
         // Check for rate limiting before parsing JSON
         if (weatherResponse.status === 429) {
@@ -598,7 +598,10 @@ function displayWeather(data) {
     
     // Pressure with trend
     displayPressure(data);
-    
+
+    // Cloud coverage and sky visibility
+    displayCloudCoverage(data);
+
     // Sunrise and sunset times (for today, index 0)
     if (data.daily && data.daily.sunrise && data.daily.sunrise[0]) {
         const sunriseTime = new Date(data.daily.sunrise[0]);
@@ -1197,6 +1200,861 @@ function displayPressure(data) {
     
     trendElement.textContent = trend;
     statusElement.textContent = trendText;
+}
+
+// Cloud coverage description based on percentage
+function getCloudCoverDescription(percent) {
+    if (percent <= 10) return 'Clear';
+    if (percent <= 25) return 'Mostly Clear';
+    if (percent <= 50) return 'Partly Cloudy';
+    if (percent <= 75) return 'Mostly Cloudy';
+    if (percent <= 90) return 'Cloudy';
+    return 'Overcast';
+}
+
+// Get cloud icon based on coverage percentage
+function getCloudIcon(percent) {
+    if (percent <= 10) return '☀️';
+    if (percent <= 25) return '🌤️';
+    if (percent <= 50) return '⛅';
+    if (percent <= 75) return '🌥️';
+    return '☁️';
+}
+
+// Display cloud coverage data
+function displayCloudCoverage(data) {
+    if (!data.current || data.current.cloud_cover === undefined) {
+        document.getElementById('skySection').classList.add('hidden');
+        return;
+    }
+
+    document.getElementById('skySection').classList.remove('hidden');
+
+    // Current cloud coverage
+    const totalCover = data.current.cloud_cover;
+    document.getElementById('cloudCoverTotal').textContent = `${totalCover}%`;
+    document.getElementById('cloudCoverDesc').textContent = getCloudCoverDescription(totalCover);
+
+    // Get hourly cloud data for current hour
+    if (data.hourly && data.hourly.cloud_cover_high) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const today = now.toDateString();
+
+        // Find current hour index
+        let currentIdx = -1;
+        for (let i = 0; i < data.hourly.time.length; i++) {
+            const hourTime = new Date(data.hourly.time[i]);
+            if (hourTime.getHours() === currentHour && hourTime.toDateString() === today) {
+                currentIdx = i;
+                break;
+            }
+        }
+
+        if (currentIdx >= 0) {
+            const highCover = data.hourly.cloud_cover_high[currentIdx] || 0;
+            const midCover = data.hourly.cloud_cover_mid[currentIdx] || 0;
+            const lowCover = data.hourly.cloud_cover_low[currentIdx] || 0;
+
+            document.getElementById('cloudCoverHigh').textContent = `${highCover}%`;
+            document.getElementById('cloudCoverMid').textContent = `${midCover}%`;
+            document.getElementById('cloudCoverLow').textContent = `${lowCover}%`;
+        }
+    }
+
+    // Display 24-hour cloud forecast
+    displayCloudForecast(data);
+
+    // Calculate and display sky visibility
+    displaySkyVisibility(data);
+}
+
+// Display 24-hour cloud forecast
+function displayCloudForecast(data) {
+    const container = document.getElementById('cloudForecast').querySelector('div');
+    container.innerHTML = '';
+
+    if (!data.hourly || !data.hourly.cloud_cover) return;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const today = now.toDateString();
+
+    // Find starting index (current hour)
+    let startIndex = 0;
+    for (let i = 0; i < data.hourly.time.length; i++) {
+        const hourTime = new Date(data.hourly.time[i]);
+        if (hourTime.getHours() >= currentHour && hourTime.toDateString() === today) {
+            startIndex = i;
+            break;
+        }
+    }
+
+    // Show 24 hours of cloud forecast
+    for (let i = startIndex; i < Math.min(startIndex + 24, data.hourly.time.length); i++) {
+        const time = new Date(data.hourly.time[i]);
+        const cloudCover = data.hourly.cloud_cover[i] || 0;
+        const highCover = data.hourly.cloud_cover_high ? data.hourly.cloud_cover_high[i] || 0 : 0;
+        const midCover = data.hourly.cloud_cover_mid ? data.hourly.cloud_cover_mid[i] || 0 : 0;
+        const lowCover = data.hourly.cloud_cover_low ? data.hourly.cloud_cover_low[i] || 0 : 0;
+
+        const hour = time.getHours();
+        const isNight = hour < 6 || hour >= 20;
+        const icon = getCloudIcon(cloudCover);
+
+        const item = document.createElement('div');
+        item.className = `stat-card rounded-xl p-3 min-w-[80px] text-center ${isNight ? 'bg-indigo-900/30' : ''}`;
+        item.innerHTML = `
+            <div class="text-gray-400 text-xs mb-1">${time.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })}</div>
+            <div class="text-2xl mb-1">${icon}</div>
+            <div class="text-white font-semibold">${cloudCover}%</div>
+            <div class="text-xs text-gray-500 mt-1">
+                <div class="flex justify-between">
+                    <span class="text-blue-200">H:</span>
+                    <span>${highCover}%</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-300">M:</span>
+                    <span>${midCover}%</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400">L:</span>
+                    <span>${lowCover}%</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(item);
+    }
+}
+
+// Estimate light pollution based on location (simplified Bortle scale estimation)
+function estimateLightPollution(lat, lon) {
+    // This is a simplified estimation based on latitude proximity to major population centers
+    // In a real implementation, you'd use a light pollution map API or database
+
+    // Default to suburban (Bortle 5-6)
+    let bortleClass = 5;
+    let description = 'Suburban';
+
+    // Very rough estimation based on common patterns
+    // This could be improved with actual light pollution data
+    const absLat = Math.abs(lat);
+
+    // Higher latitudes tend to have less light pollution (fewer people)
+    if (absLat > 60) {
+        bortleClass = 3;
+        description = 'Rural';
+    } else if (absLat > 50) {
+        bortleClass = 4;
+        description = 'Rural/Suburban';
+    }
+
+    return { bortleClass, description };
+}
+
+// Calculate sky quality for stargazing
+function calculateSkyQuality(data, lat, lon) {
+    let score = 10; // Perfect score
+    let limitingMag = 6.5; // Perfect dark sky NELM
+
+    // Get current cloud coverage
+    const now = new Date();
+    const currentHour = now.getHours();
+    const today = now.toDateString();
+
+    let cloudPenalty = 0;
+    let highCover = 0, midCover = 0, lowCover = 0, totalCover = 0;
+
+    if (data.hourly && data.hourly.cloud_cover) {
+        // Find current hour index
+        let currentIdx = -1;
+        for (let i = 0; i < data.hourly.time.length; i++) {
+            const hourTime = new Date(data.hourly.time[i]);
+            if (hourTime.getHours() === currentHour && hourTime.toDateString() === today) {
+                currentIdx = i;
+                break;
+            }
+        }
+
+        if (currentIdx >= 0) {
+            totalCover = data.hourly.cloud_cover[currentIdx] || 0;
+            highCover = data.hourly.cloud_cover_high ? data.hourly.cloud_cover_high[currentIdx] || 0 : 0;
+            midCover = data.hourly.cloud_cover_mid ? data.hourly.cloud_cover_mid[currentIdx] || 0 : 0;
+            lowCover = data.hourly.cloud_cover_low ? data.hourly.cloud_cover_low[currentIdx] || 0 : 0;
+
+            // Cloud penalty weighted by altitude (low clouds block more)
+            // High clouds: thin, allow some starlight through
+            // Low clouds: dense, block almost everything
+            cloudPenalty = (lowCover * 0.05) + (midCover * 0.03) + (highCover * 0.015);
+            cloudPenalty = Math.min(cloudPenalty, 5); // Max 5 point penalty
+        }
+    }
+
+    // Moon penalty
+    let moonPenalty = 0;
+    if (typeof SunCalc !== 'undefined') {
+        const moonIllum = SunCalc.getMoonIllumination(now);
+        const illumination = moonIllum.fraction * 100;
+
+        // Full moon can reduce limiting magnitude by 2-3
+        moonPenalty = (illumination / 100) * 3;
+
+        // Check if moon is above horizon
+        const moonPos = SunCalc.getMoonPosition(now, lat, lon);
+        if (moonPos.altitude < 0) {
+            moonPenalty = 0; // Moon below horizon, no penalty
+        }
+    }
+
+    // Light pollution penalty
+    const lightPollution = estimateLightPollution(lat, lon);
+    const lpPenalty = (lightPollution.bortleClass - 1) * 0.5; // Bortle 1 = no penalty, Bortle 9 = 4 point penalty
+
+    // Calculate final score
+    score = Math.max(0, 10 - cloudPenalty - moonPenalty - lpPenalty);
+
+    // Convert score to limiting magnitude (roughly)
+    // Score 10 = mag 6.5, Score 0 = mag 2
+    limitingMag = 2 + (score / 10) * 4.5;
+
+    // Get visibility if available
+    let visibility = null;
+    if (data.hourly && data.hourly.visibility) {
+        let currentIdx = -1;
+        for (let i = 0; i < data.hourly.time.length; i++) {
+            const hourTime = new Date(data.hourly.time[i]);
+            if (hourTime.getHours() === currentHour && hourTime.toDateString() === today) {
+                currentIdx = i;
+                break;
+            }
+        }
+        if (currentIdx >= 0) {
+            visibility = data.hourly.visibility[currentIdx];
+        }
+    }
+
+    return {
+        score: Math.round(score * 10) / 10,
+        limitingMag: Math.round(limitingMag * 10) / 10,
+        cloudPenalty: Math.round(cloudPenalty * 10) / 10,
+        moonPenalty: Math.round(moonPenalty * 10) / 10,
+        lpPenalty: Math.round(lpPenalty * 10) / 10,
+        lightPollution,
+        visibility,
+        totalCover,
+        highCover,
+        midCover,
+        lowCover
+    };
+}
+
+// Get sky quality label and color
+function getSkyQualityLabel(score) {
+    if (score >= 8) return { label: 'Excellent', color: 'text-green-400' };
+    if (score >= 6) return { label: 'Good', color: 'text-cyan-400' };
+    if (score >= 4) return { label: 'Fair', color: 'text-yellow-400' };
+    if (score >= 2) return { label: 'Poor', color: 'text-orange-400' };
+    return { label: 'Very Poor', color: 'text-red-400' };
+}
+
+// Display sky visibility information
+function displaySkyVisibility(data) {
+    const skyQuality = calculateSkyQuality(data, currentLat, currentLon);
+    const qualityLabel = getSkyQualityLabel(skyQuality.score);
+
+    // Sky quality
+    document.getElementById('skyQualityValue').textContent = `${skyQuality.score}/10`;
+    document.getElementById('skyQualityValue').className = `text-3xl font-bold ${qualityLabel.color}`;
+    document.getElementById('skyQualityLabel').textContent = qualityLabel.label;
+    document.getElementById('skyQualityLabel').className = `text-sm font-semibold ${qualityLabel.color}`;
+    document.getElementById('skyQualityMag').textContent = `~mag ${skyQuality.limitingMag}`;
+
+    // Visibility
+    if (skyQuality.visibility !== null) {
+        const visKm = skyQuality.visibility / 1000;
+        const visMi = visKm * 0.621371;
+        document.getElementById('visibilityValue').textContent = `${visMi.toFixed(1)} mi`;
+
+        let visDesc = 'Excellent';
+        if (visMi < 1) visDesc = 'Very Poor';
+        else if (visMi < 3) visDesc = 'Poor';
+        else if (visMi < 6) visDesc = 'Moderate';
+        else if (visMi < 10) visDesc = 'Good';
+
+        document.getElementById('visibilityDesc').textContent = visDesc;
+    } else {
+        document.getElementById('visibilityValue').textContent = '--';
+        document.getElementById('visibilityDesc').textContent = '';
+    }
+
+    // Light pollution
+    document.getElementById('lightPollutionValue').textContent = `Bortle ${skyQuality.lightPollution.bortleClass}`;
+    document.getElementById('lightPollutionDesc').textContent = skyQuality.lightPollution.description;
+}
+
+// Open sky methodology modal
+function openSkyMethodologyModal() {
+    document.getElementById('skyMethodologyModal').classList.add('active');
+    // Re-render MathJax if available
+    if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+        MathJax.typesetPromise();
+    }
+}
+
+// Close sky methodology modal
+function closeSkyMethodologyModal() {
+    document.getElementById('skyMethodologyModal').classList.remove('active');
+}
+
+// Meteorological explanations for each metric
+const metricInfo = {
+    feelsLike: {
+        icon: '🌡️',
+        title: 'Feels Like Temperature',
+        content: `
+            <div class="stat-card rounded-xl p-5 space-y-4">
+                <p class="text-gray-300 text-sm">
+                    The "Feels Like" temperature (also called <strong>apparent temperature</strong>) is what the weather actually feels like on your skin,
+                    accounting for factors beyond just air temperature.
+                </p>
+
+                <h4 class="text-white font-semibold mt-4">How It's Calculated</h4>
+                <div class="space-y-3 mt-3">
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="text-orange-300 font-semibold mb-1"><i class="fas fa-sun mr-2"></i>In Warm Weather: Heat Index</div>
+                        <div class="text-gray-400 text-sm">
+                            Combines temperature and humidity. High humidity prevents sweat evaporation, making it feel hotter.
+                            At 90°F with 70% humidity, it can feel like 106°F!
+                        </div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="text-cyan-300 font-semibold mb-1"><i class="fas fa-wind mr-2"></i>In Cold Weather: Wind Chill</div>
+                        <div class="text-gray-400 text-sm">
+                            Combines temperature and wind speed. Wind accelerates heat loss from exposed skin.
+                            At 30°F with 20 mph wind, it feels like 17°F.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-blue-900/30 rounded-lg">
+                    <p class="text-blue-200 text-sm"><i class="fas fa-lightbulb mr-2"></i><strong>Pro tip:</strong> Use feels-like temperature when deciding what to wear, not just the actual temperature!</p>
+                </div>
+            </div>
+        `
+    },
+    humidity: {
+        icon: '💧',
+        title: 'Humidity & Dew Point',
+        content: `
+            <div class="stat-card rounded-xl p-5 space-y-4">
+                <p class="text-gray-300 text-sm">
+                    <strong>Relative Humidity</strong> is the percentage of water vapor in the air compared to the maximum it can hold at that temperature.
+                </p>
+
+                <h4 class="text-white font-semibold mt-4">Understanding Humidity</h4>
+                <div class="grid grid-cols-2 gap-2 text-center text-sm mt-3">
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-green-400 font-bold">30-50%</div>
+                        <div class="text-gray-500 text-xs">Comfortable</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-yellow-400 font-bold">50-60%</div>
+                        <div class="text-gray-500 text-xs">Slightly humid</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-orange-400 font-bold">60-70%</div>
+                        <div class="text-gray-500 text-xs">Humid</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-red-400 font-bold">70%+</div>
+                        <div class="text-gray-500 text-xs">Very humid</div>
+                    </div>
+                </div>
+
+                <h4 class="text-white font-semibold mt-4">Dew Point</h4>
+                <p class="text-gray-300 text-sm">
+                    The <strong>dew point</strong> is the temperature at which air becomes saturated and dew forms.
+                    It's actually a better indicator of comfort than relative humidity:
+                </p>
+                <div class="grid grid-cols-3 gap-2 text-center text-xs mt-3">
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-green-400 font-bold">&lt;55°F</div>
+                        <div class="text-gray-500">Comfortable</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-yellow-400 font-bold">55-65°F</div>
+                        <div class="text-gray-500">Sticky</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-red-400 font-bold">&gt;65°F</div>
+                        <div class="text-gray-500">Oppressive</div>
+                    </div>
+                </div>
+            </div>
+        `
+    },
+    wind: {
+        icon: '💨',
+        title: 'Wind Speed',
+        content: `
+            <div class="stat-card rounded-xl p-5 space-y-4">
+                <p class="text-gray-300 text-sm">
+                    Wind speed is measured at 10 meters (33 feet) above ground level, the standard height for meteorological observations.
+                </p>
+
+                <h4 class="text-white font-semibold mt-4">Beaufort Wind Scale (mph)</h4>
+                <div class="space-y-2 text-sm mt-3">
+                    <div class="stat-card rounded-lg p-2 flex justify-between items-center">
+                        <span class="text-gray-300">Calm</span>
+                        <span class="text-green-400 font-bold">&lt;1 mph</span>
+                    </div>
+                    <div class="stat-card rounded-lg p-2 flex justify-between items-center">
+                        <span class="text-gray-300">Light breeze</span>
+                        <span class="text-green-400 font-bold">4-7 mph</span>
+                    </div>
+                    <div class="stat-card rounded-lg p-2 flex justify-between items-center">
+                        <span class="text-gray-300">Gentle breeze</span>
+                        <span class="text-cyan-400 font-bold">8-12 mph</span>
+                    </div>
+                    <div class="stat-card rounded-lg p-2 flex justify-between items-center">
+                        <span class="text-gray-300">Moderate breeze</span>
+                        <span class="text-yellow-400 font-bold">13-18 mph</span>
+                    </div>
+                    <div class="stat-card rounded-lg p-2 flex justify-between items-center">
+                        <span class="text-gray-300">Fresh breeze</span>
+                        <span class="text-orange-400 font-bold">19-24 mph</span>
+                    </div>
+                    <div class="stat-card rounded-lg p-2 flex justify-between items-center">
+                        <span class="text-gray-300">Strong breeze</span>
+                        <span class="text-red-400 font-bold">25-31 mph</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-cyan-900/30 rounded-lg">
+                    <p class="text-cyan-200 text-sm"><i class="fas fa-info-circle mr-2"></i>Wind affects the "feels like" temperature significantly in cold weather due to wind chill.</p>
+                </div>
+            </div>
+        `
+    },
+    uvIndex: {
+        icon: '☀️',
+        title: 'UV Index',
+        content: `
+            <div class="stat-card rounded-xl p-5 space-y-4">
+                <p class="text-gray-300 text-sm">
+                    The <strong>UV Index</strong> measures the strength of ultraviolet radiation from the sun.
+                    Higher values mean greater potential for skin and eye damage.
+                </p>
+
+                <h4 class="text-white font-semibold mt-4">UV Index Scale</h4>
+                <div class="space-y-2 text-sm mt-3">
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-green-400 font-bold">0-2 Low</span>
+                            <span class="text-gray-400">Minimal protection needed</span>
+                        </div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-yellow-400 font-bold">3-5 Moderate</span>
+                            <span class="text-gray-400">Wear sunscreen</span>
+                        </div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-orange-400 font-bold">6-7 High</span>
+                            <span class="text-gray-400">Protection essential</span>
+                        </div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-red-400 font-bold">8-10 Very High</span>
+                            <span class="text-gray-400">Extra protection needed</span>
+                        </div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-purple-400 font-bold">11+ Extreme</span>
+                            <span class="text-gray-400">Avoid midday sun</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-yellow-900/30 rounded-lg">
+                    <p class="text-yellow-200 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i><strong>Note:</strong> UV rays can penetrate clouds! Apply sunscreen even on cloudy days when UV index is moderate or higher.</p>
+                </div>
+            </div>
+        `
+    },
+    pressure: {
+        icon: '📊',
+        title: 'Barometric Pressure',
+        content: `
+            <div class="stat-card rounded-xl p-5 space-y-4">
+                <p class="text-gray-300 text-sm">
+                    <strong>Barometric pressure</strong> (atmospheric pressure) is the weight of the air above us.
+                    It's measured in inches of mercury (inHg) and is a key indicator of weather changes.
+                </p>
+
+                <h4 class="text-white font-semibold mt-4">Pressure & Weather</h4>
+                <div class="space-y-3 mt-3">
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="text-green-300 font-semibold mb-1"><i class="fas fa-arrow-up mr-2"></i>Rising Pressure (↑)</div>
+                        <div class="text-gray-400 text-sm">
+                            Usually indicates improving weather, clearing skies, and stable conditions.
+                        </div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="text-red-300 font-semibold mb-1"><i class="fas fa-arrow-down mr-2"></i>Falling Pressure (↓)</div>
+                        <div class="text-gray-400 text-sm">
+                            Often signals approaching storms, rain, or unsettled weather. Rapid drops can indicate severe weather.
+                        </div>
+                    </div>
+                    <div class="stat-card rounded-lg p-3">
+                        <div class="text-gray-300 font-semibold mb-1"><i class="fas fa-arrows-alt-h mr-2"></i>Steady Pressure (→)</div>
+                        <div class="text-gray-400 text-sm">
+                            Current weather pattern is likely to continue.
+                        </div>
+                    </div>
+                </div>
+
+                <h4 class="text-white font-semibold mt-4">Reference Values</h4>
+                <div class="grid grid-cols-3 gap-2 text-center text-xs mt-3">
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-blue-400 font-bold">&lt;29.80"</div>
+                        <div class="text-gray-500">Low</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-green-400 font-bold">29.80-30.20"</div>
+                        <div class="text-gray-500">Normal</div>
+                    </div>
+                    <div class="stat-card rounded-lg p-2">
+                        <div class="text-purple-400 font-bold">&gt;30.20"</div>
+                        <div class="text-gray-500">High</div>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-blue-900/30 rounded-lg">
+                    <p class="text-blue-200 text-sm"><i class="fas fa-head-side-cough mr-2"></i>Some people experience headaches or sinus discomfort during rapid pressure changes.</p>
+                </div>
+            </div>
+        `
+    }
+};
+
+// Show metric info modal
+function showMetricInfo(metric) {
+    const info = metricInfo[metric];
+    if (!info) return;
+
+    document.getElementById('metricInfoIcon').textContent = info.icon;
+    document.getElementById('metricInfoTitleText').textContent = info.title;
+    document.getElementById('metricInfoContent').innerHTML = info.content;
+    document.getElementById('metricInfoModal').classList.add('active');
+}
+
+// Close metric info modal
+function closeMetricInfoModal() {
+    document.getElementById('metricInfoModal').classList.remove('active');
+}
+
+// Toggle expandable science sections
+function toggleScienceSection(sectionId) {
+    const content = document.getElementById(sectionId + 'Content');
+    const toggle = document.getElementById(sectionId + 'Toggle');
+
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        toggle.classList.add('rotate-90');
+    } else {
+        content.classList.add('hidden');
+        toggle.classList.remove('rotate-90');
+    }
+}
+
+// Weather Report Generator
+let speechSynthesis = window.speechSynthesis;
+let currentUtterance = null;
+let isSpeaking = false;
+
+function generateWeatherReport() {
+    if (!currentWeatherData) {
+        alert('Please wait for weather data to load first.');
+        return;
+    }
+
+    const data = currentWeatherData;
+    const location = currentLocationName || 'your location';
+    const now = new Date();
+
+    // Generate report content
+    const report = generateReportText(data, location, now);
+
+    // Update modal content
+    document.getElementById('reportLocationName').textContent = location;
+    document.getElementById('reportDateTime').textContent = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+
+    // Display report paragraphs with typing effect
+    displayReportWithAnimation(report.paragraphs);
+
+    // Display quick stats
+    displayReportStats(data);
+
+    // Show modal
+    document.getElementById('weatherReportModal').classList.add('active');
+
+    // Start speech after a short delay
+    setTimeout(() => {
+        speakReport(report.fullText);
+    }, 500);
+}
+
+function generateReportText(data, location, now) {
+    const temp = Math.round(data.current.temperature_2m);
+    const feelsLike = Math.round(data.current.apparent_temperature);
+    const humidity = data.current.relative_humidity_2m;
+    const windSpeed = data.current.wind_speed_10m;
+    const condition = getWeatherDescription(data.current.weather_code);
+    const uvIndex = data.current.uv_index;
+
+    // Get today's high/low (index 2 because of past_days=2)
+    const todayHigh = data.daily?.temperature_2m_max?.[2] ? Math.round(data.daily.temperature_2m_max[2]) : null;
+    const todayLow = data.daily?.temperature_2m_min?.[2] ? Math.round(data.daily.temperature_2m_min[2]) : null;
+
+    // Check for precipitation in the next 24 hours
+    let precipChance = false;
+    let precipType = 'rain';
+    if (data.hourly?.precipitation_probability) {
+        const startIdx = findCurrentHourIndex(data);
+        for (let i = startIdx; i < Math.min(startIdx + 24, data.hourly.precipitation_probability.length); i++) {
+            if (data.hourly.precipitation_probability[i] > 50) {
+                precipChance = true;
+                if (data.hourly.snowfall && data.hourly.snowfall[i] > 0) {
+                    precipType = 'snow';
+                }
+                break;
+            }
+        }
+    }
+
+    // Build report paragraphs
+    const paragraphs = [];
+    let fullText = '';
+
+    // Opening
+    const timeOfDay = now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening';
+    const opening = `Good ${timeOfDay}! Here's your weather update for ${location}.`;
+    paragraphs.push({ text: opening, highlight: false });
+    fullText += opening + ' ';
+
+    // Current conditions
+    const currentConditions = `Currently, it's ${temp} degrees with ${condition.toLowerCase()} skies. ` +
+        `It feels like ${feelsLike} degrees outside.`;
+    paragraphs.push({ text: currentConditions, highlight: true });
+    fullText += currentConditions + ' ';
+
+    // Temperature range
+    if (todayHigh !== null && todayLow !== null) {
+        const tempRange = `Today's high will reach ${todayHigh} degrees, with a low of ${todayLow} degrees tonight.`;
+        paragraphs.push({ text: tempRange, highlight: false });
+        fullText += tempRange + ' ';
+    }
+
+    // Wind and humidity
+    const windHumidity = `Winds are blowing at ${windSpeed} miles per hour, and humidity is at ${humidity} percent.`;
+    paragraphs.push({ text: windHumidity, highlight: false });
+    fullText += windHumidity + ' ';
+
+    // UV and sun safety
+    if (uvIndex !== undefined) {
+        let uvAdvice = '';
+        if (uvIndex <= 2) {
+            uvAdvice = `The UV index is low at ${uvIndex}, so no special sun protection is needed.`;
+        } else if (uvIndex <= 5) {
+            uvAdvice = `The UV index is moderate at ${uvIndex}. Consider wearing sunscreen if you'll be outside for extended periods.`;
+        } else if (uvIndex <= 7) {
+            uvAdvice = `The UV index is high at ${uvIndex}. Sunscreen and protective clothing are recommended.`;
+        } else {
+            uvAdvice = `The UV index is very high at ${uvIndex}. Take extra precautions if going outdoors.`;
+        }
+        paragraphs.push({ text: uvAdvice, highlight: uvIndex > 5 });
+        fullText += uvAdvice + ' ';
+    }
+
+    // Precipitation outlook
+    if (precipChance) {
+        const precipInfo = `Looking ahead, there's a chance of ${precipType} in the next 24 hours. You may want to grab an umbrella.`;
+        paragraphs.push({ text: precipInfo, highlight: true });
+        fullText += precipInfo + ' ';
+    } else {
+        const noPrecip = `No significant precipitation is expected in the next 24 hours.`;
+        paragraphs.push({ text: noPrecip, highlight: false });
+        fullText += noPrecip + ' ';
+    }
+
+    // Closing
+    const closing = `That's your weather update. Have a great ${timeOfDay}!`;
+    paragraphs.push({ text: closing, highlight: false });
+    fullText += closing;
+
+    return { paragraphs, fullText };
+}
+
+function findCurrentHourIndex(data) {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const today = now.toDateString();
+
+    for (let i = 0; i < data.hourly.time.length; i++) {
+        const hourTime = new Date(data.hourly.time[i]);
+        if (hourTime.getHours() >= currentHour && hourTime.toDateString() === today) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+function displayReportWithAnimation(paragraphs) {
+    const container = document.getElementById('reportContent');
+    container.innerHTML = '';
+
+    paragraphs.forEach((para, index) => {
+        const p = document.createElement('p');
+        p.className = `transition-all duration-500 ${para.highlight ? 'text-yellow-200 font-semibold' : 'text-gray-200'}`;
+        p.style.opacity = '0';
+        p.style.transform = 'translateY(10px)';
+        p.textContent = para.text;
+        container.appendChild(p);
+
+        // Animate in with delay
+        setTimeout(() => {
+            p.style.opacity = '1';
+            p.style.transform = 'translateY(0)';
+        }, index * 300);
+    });
+}
+
+function displayReportStats(data) {
+    const container = document.getElementById('reportStats');
+    const temp = Math.round(data.current.temperature_2m);
+    const humidity = data.current.relative_humidity_2m;
+    const windSpeed = data.current.wind_speed_10m;
+    const uvIndex = data.current.uv_index;
+
+    container.innerHTML = `
+        <div class="stat-card rounded-lg p-3 text-center">
+            <div class="text-orange-400 text-2xl font-bold">${temp}°</div>
+            <div class="text-gray-400 text-xs">Temperature</div>
+        </div>
+        <div class="stat-card rounded-lg p-3 text-center">
+            <div class="text-blue-400 text-2xl font-bold">${humidity}%</div>
+            <div class="text-gray-400 text-xs">Humidity</div>
+        </div>
+        <div class="stat-card rounded-lg p-3 text-center">
+            <div class="text-cyan-400 text-2xl font-bold">${windSpeed}</div>
+            <div class="text-gray-400 text-xs">Wind (mph)</div>
+        </div>
+        <div class="stat-card rounded-lg p-3 text-center">
+            <div class="text-yellow-400 text-2xl font-bold">${uvIndex || '--'}</div>
+            <div class="text-gray-400 text-xs">UV Index</div>
+        </div>
+    `;
+}
+
+function speakReport(text) {
+    if (!speechSynthesis) {
+        console.log('Speech synthesis not supported');
+        return;
+    }
+
+    // Cancel any ongoing speech
+    speechSynthesis.cancel();
+
+    currentUtterance = new SpeechSynthesisUtterance(text);
+    currentUtterance.rate = 0.9; // Slightly slower for clarity
+    currentUtterance.pitch = 1;
+    currentUtterance.volume = 1;
+
+    // Try to use a more natural voice
+    const voices = speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v =>
+        v.name.includes('Google') ||
+        v.name.includes('Natural') ||
+        v.name.includes('Samantha') ||
+        v.name.includes('Daniel')
+    );
+    if (preferredVoice) {
+        currentUtterance.voice = preferredVoice;
+    }
+
+    currentUtterance.onend = () => {
+        isSpeaking = false;
+        updateSpeechButton();
+    };
+
+    currentUtterance.onstart = () => {
+        isSpeaking = true;
+        updateSpeechButton();
+    };
+
+    speechSynthesis.speak(currentUtterance);
+}
+
+function toggleSpeech() {
+    if (!speechSynthesis) return;
+
+    if (isSpeaking) {
+        speechSynthesis.cancel();
+        isSpeaking = false;
+    } else {
+        // Regenerate and speak
+        if (currentWeatherData) {
+            const report = generateReportText(currentWeatherData, currentLocationName || 'your location', new Date());
+            speakReport(report.fullText);
+        }
+    }
+    updateSpeechButton();
+}
+
+function updateSpeechButton() {
+    const btn = document.getElementById('toggleSpeechBtn');
+    if (btn) {
+        btn.innerHTML = isSpeaking ?
+            '<i class="fas fa-volume-mute"></i>' :
+            '<i class="fas fa-volume-up"></i>';
+        btn.title = isSpeaking ? 'Stop speech' : 'Play speech';
+    }
+}
+
+function restartReport() {
+    if (currentWeatherData) {
+        const report = generateReportText(currentWeatherData, currentLocationName || 'your location', new Date());
+        displayReportWithAnimation(report.paragraphs);
+
+        // Restart speech
+        if (speechSynthesis) {
+            speechSynthesis.cancel();
+            setTimeout(() => speakReport(report.fullText), 500);
+        }
+    }
+}
+
+function closeWeatherReport() {
+    // Stop speech
+    if (speechSynthesis) {
+        speechSynthesis.cancel();
+    }
+    isSpeaking = false;
+    updateSpeechButton();
+
+    document.getElementById('weatherReportModal').classList.remove('active');
 }
 
 function displayPrecipitationTiming(data) {
@@ -2523,6 +3381,18 @@ document.getElementById('closeSymptomRiskModal').addEventListener('click', () =>
     document.getElementById('symptomRiskModal').classList.remove('active');
 });
 
+document.getElementById('closeSkyMethodologyModal').addEventListener('click', () => {
+    document.getElementById('skyMethodologyModal').classList.remove('active');
+});
+
+document.getElementById('closeMetricInfoModal').addEventListener('click', () => {
+    document.getElementById('metricInfoModal').classList.remove('active');
+});
+
+document.getElementById('closeWeatherReportModal').addEventListener('click', () => {
+    closeWeatherReport();
+});
+
 // Close modals when clicking outside
 document.getElementById('hourlyModal').addEventListener('click', (e) => {
     if (e.target.id === 'hourlyModal') {
@@ -2548,6 +3418,24 @@ document.getElementById('symptomRiskModal').addEventListener('click', (e) => {
     }
 });
 
+document.getElementById('skyMethodologyModal').addEventListener('click', (e) => {
+    if (e.target.id === 'skyMethodologyModal') {
+        document.getElementById('skyMethodologyModal').classList.remove('active');
+    }
+});
+
+document.getElementById('metricInfoModal').addEventListener('click', (e) => {
+    if (e.target.id === 'metricInfoModal') {
+        document.getElementById('metricInfoModal').classList.remove('active');
+    }
+});
+
+document.getElementById('weatherReportModal').addEventListener('click', (e) => {
+    if (e.target.id === 'weatherReportModal') {
+        closeWeatherReport();
+    }
+});
+
 // Close modals with Escape key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -2555,6 +3443,9 @@ document.addEventListener('keydown', (e) => {
         document.getElementById('dailyModal').classList.remove('active');
         document.getElementById('moonDetailsModal').classList.remove('active');
         document.getElementById('symptomRiskModal').classList.remove('active');
+        document.getElementById('skyMethodologyModal').classList.remove('active');
+        document.getElementById('metricInfoModal').classList.remove('active');
+        closeWeatherReport();
     }
 });
 
