@@ -455,7 +455,7 @@ async function fetchWeather(lat, lon) {
 
     try {
         // Make direct request to Open-Meteo from browser (uses user's IP, not shared Cloudflare IP)
-        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
 
         // Check for rate limiting before parsing JSON
         if (weatherResponse.status === 429) {
@@ -741,6 +741,12 @@ function displayWeather(data) {
     for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
         const dayIndex = i + 2; // Skip past days
         const day = parseDateString(data.daily.time[dayIndex]);
+        const apparentMaxRaw = data.daily.apparent_temperature_max ? data.daily.apparent_temperature_max[dayIndex] : null;
+        const apparentMinRaw = data.daily.apparent_temperature_min ? data.daily.apparent_temperature_min[dayIndex] : null;
+        const hasApparentTemps = apparentMaxRaw !== null && apparentMaxRaw !== undefined && apparentMinRaw !== null && apparentMinRaw !== undefined;
+        const apparentMax = hasApparentTemps ? Math.round(apparentMaxRaw) : null;
+        const apparentMin = hasApparentTemps ? Math.round(apparentMinRaw) : null;
+        const apparentUnit = data.daily_units.apparent_temperature_max || data.daily_units.temperature_2m_max;
         const dayItem = document.createElement('div');
         dayItem.className = 'flex items-center justify-between bg-white/10 rounded-lg p-4 backdrop-blur-sm clickable';
         dayItem.innerHTML = `
@@ -755,6 +761,7 @@ function displayWeather(data) {
                 <div class="text-right">
                     <div class="text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[dayIndex])}${data.daily_units.temperature_2m_max}</div>
                     <div class="text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[dayIndex])}${data.daily_units.temperature_2m_min}</div>
+                    ${hasApparentTemps ? `<div class="text-white/50 text-xs">Feels like ${apparentMax}${apparentUnit} / ${apparentMin}${apparentUnit}</div>` : ''}
                 </div>
                 <div class="text-white/70 text-sm text-right min-w-[100px]">
                     ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[dayIndex] || 0} ${data.daily_units.precipitation_sum}</div>`}
@@ -2222,12 +2229,15 @@ function openDailyModal(data) {
     const labels = [];
     const maxTemps = [];
     const minTemps = [];
+    const apparentMaxTemps = [];
+    const apparentMinTemps = [];
     const precip = [];
     const snowfall = [];
     const wind = [];
     const precipProb = [];
     const moonPhases = [];
     const dailyPressure = [];
+    const apparentUnit = data.daily_units.apparent_temperature_max || data.daily_units.temperature_2m_max;
     
     // Start from index 2 to skip past 2 days due to past_days=2
     for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
@@ -2236,6 +2246,10 @@ function openDailyModal(data) {
         labels.push(day.toLocaleDateString('en-US', { weekday: 'short' }));
         maxTemps.push(Math.round(data.daily.temperature_2m_max[dayIndex]));
         minTemps.push(Math.round(data.daily.temperature_2m_min[dayIndex]));
+        const apparentMaxRaw = data.daily.apparent_temperature_max ? data.daily.apparent_temperature_max[dayIndex] : null;
+        const apparentMinRaw = data.daily.apparent_temperature_min ? data.daily.apparent_temperature_min[dayIndex] : null;
+        apparentMaxTemps.push(apparentMaxRaw !== null && apparentMaxRaw !== undefined ? Math.round(apparentMaxRaw) : null);
+        apparentMinTemps.push(apparentMinRaw !== null && apparentMinRaw !== undefined ? Math.round(apparentMinRaw) : null);
         precip.push(data.daily.precipitation_sum[dayIndex] || 0);
         snowfall.push(data.daily.snowfall_sum ? data.daily.snowfall_sum[dayIndex] || 0 : 0);
         wind.push(data.daily.wind_speed_10m_max[dayIndex]);
@@ -2446,6 +2460,7 @@ function openDailyModal(data) {
                 <div class="bg-white/10 rounded p-3">
                     <div class="text-white/70 text-xs mb-1">High / Low</div>
                     <div class="text-white font-bold">${Math.round(maxTemps[i])}${data.daily_units.temperature_2m_max} / ${Math.round(minTemps[i])}${data.daily_units.temperature_2m_min}</div>
+                    ${apparentMaxTemps[i] !== null && apparentMaxTemps[i] !== undefined && apparentMinTemps[i] !== null && apparentMinTemps[i] !== undefined ? `<div class="text-white/60 text-xs mt-1">Feels like ${apparentMaxTemps[i]}${apparentUnit} / ${apparentMinTemps[i]}${apparentUnit}</div>` : ''}
                 </div>
                 ${snowfall[i] > 0 ? `
                 <div class="bg-white/10 rounded p-3">
