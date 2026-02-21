@@ -2258,7 +2258,7 @@ function openDailyModal(data) {
         
         // Calculate daily average pressure from hourly data (noon value for each day)
         if (data.hourly && data.hourly.surface_pressure) {
-            const dayStr = data.daily.time[i];
+            const dayStr = data.daily.time[dayIndex];
             const noonIdx = data.hourly.time.findIndex(t => t.startsWith(dayStr) && t.includes('T12:'));
             if (noonIdx !== -1) {
                 // Convert hPa to inHg
@@ -2314,6 +2314,24 @@ function openDailyModal(data) {
                         borderColor: 'rgb(54, 162, 235)',
                         backgroundColor: 'rgba(54, 162, 235, 0.2)',
                         tension: 0.4
+                    },
+                    {
+                        label: `Feels Like High (${apparentUnit})`,
+                        data: apparentMaxTemps,
+                        borderColor: 'rgb(251, 146, 60)',
+                        backgroundColor: 'rgba(251, 146, 60, 0.2)',
+                        tension: 0.4,
+                        borderDash: [6, 4],
+                        spanGaps: true
+                    },
+                    {
+                        label: `Feels Like Low (${apparentUnit})`,
+                        data: apparentMinTemps,
+                        borderColor: 'rgb(56, 189, 248)',
+                        backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                        tension: 0.4,
+                        borderDash: [6, 4],
+                        spanGaps: true
                     }
                 ]
             }
