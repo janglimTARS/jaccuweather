@@ -1471,7 +1471,7 @@ async function fetchNwsSnowForecast(lat, lon) {
 }
 
 async function fetchEnsembleSnowForecast(lat, lon) {
-    const url = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&hourly=snowfall&models=icon_seamless&timezone=auto`;
+    const url = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&hourly=snowfall&models=gfs_seamless,icon_seamless&timezone=auto`;
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`Ensemble request failed (${response.status})`);
@@ -1496,7 +1496,7 @@ async function fetchEnsembleSnowForecast(lat, lon) {
 
     const memberKeys = Object.keys(hourly).filter(key => key.startsWith('snowfall_member'));
     if (!memberKeys.length || !inWindowIndexes.length) {
-        return { mean: 0, stddev: 0, low: 0, high: 0 };
+        return { mean: 0, low: 0, high: 0 };
     }
 
     const totalsInches = memberKeys.map(key => {
@@ -1508,15 +1508,21 @@ async function fetchEnsembleSnowForecast(lat, lon) {
         return totalCm / 2.54;
     });
 
-    const mean = totalsInches.reduce((a, b) => a + b, 0) / totalsInches.length;
-    const variance = totalsInches.reduce((sum, v) => sum + (v - mean) ** 2, 0) / totalsInches.length;
-    const stddev = Math.sqrt(variance);
+    const sorted = [...totalsInches].sort((a, b) => a - b);
+    const n = sorted.length;
+    const mean = totalsInches.reduce((a, b) => a + b, 0) / n;
+
+    function pct(arr, p) {
+        const idx = p * (arr.length - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        return lo === hi ? arr[lo] : arr[lo] + (arr[hi] - arr[lo]) * (idx - lo);
+    }
 
     return {
         mean,
-        stddev,
-        low: Math.max(0, mean - stddev),
-        high: mean + stddev
+        low: Math.max(0, pct(sorted, 0.25)),
+        high: pct(sorted, 0.75)
     };
 }
 
@@ -1559,7 +1565,7 @@ async function updateSnowForecastForCurrentLocation() {
 
         setSnowForecastResult(
             `${ensemble.low.toFixed(1)} – ${ensemble.high.toFixed(1)} in`,
-            `Ensemble mean: ${ensemble.mean.toFixed(1)} in ± ${ensemble.stddev.toFixed(1)} in (1σ) over the next 48 hours.`
+            `Likely range (middle 50% of GFS + ICON ensemble members). Mean: ${ensemble.mean.toFixed(1)} in over the next 48 hours.`
         );
     } catch (error) {
         if (requestId !== snowForecastRequestId) return;
