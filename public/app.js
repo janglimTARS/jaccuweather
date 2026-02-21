@@ -1496,7 +1496,7 @@ async function fetchEnsembleSnowForecast(lat, lon) {
 
     const memberKeys = Object.keys(hourly).filter(key => key.startsWith('snowfall_member'));
     if (!memberKeys.length || !inWindowIndexes.length) {
-        return { p10: 0, p50: 0, p90: 0 };
+        return { mean: 0, stddev: 0, low: 0, high: 0 };
     }
 
     const totalsInches = memberKeys.map(key => {
@@ -1506,12 +1506,17 @@ async function fetchEnsembleSnowForecast(lat, lon) {
             totalCm += Number(values[idx]) || 0;
         });
         return totalCm / 2.54;
-    }).sort((a, b) => a - b);
+    });
+
+    const mean = totalsInches.reduce((a, b) => a + b, 0) / totalsInches.length;
+    const variance = totalsInches.reduce((sum, v) => sum + (v - mean) ** 2, 0) / totalsInches.length;
+    const stddev = Math.sqrt(variance);
 
     return {
-        p10: percentile(totalsInches, 0.10),
-        p50: percentile(totalsInches, 0.50),
-        p90: percentile(totalsInches, 0.90)
+        mean,
+        stddev,
+        low: Math.max(0, mean - stddev),
+        high: mean + stddev
     };
 }
 
@@ -1547,14 +1552,14 @@ async function updateSnowForecastForCurrentLocation() {
         const ensemble = await fetchEnsembleSnowForecast(currentLat, currentLon);
         if (requestId !== snowForecastRequestId) return;
 
-        if (ensemble.p90 < 0.1) {
+        if (ensemble.high < 0.1) {
             setSnowForecastResult('No snow expected in the next 48 hours', 'Source: Ensemble Forecast');
             return;
         }
 
         setSnowForecastResult(
-            `${ensemble.p10.toFixed(1)} - ${ensemble.p90.toFixed(1)} in (median: ${ensemble.p50.toFixed(1)} in)`,
-            'Range from ensemble members over the next 48 hours.'
+            `${ensemble.low.toFixed(1)} – ${ensemble.high.toFixed(1)} in`,
+            `Ensemble mean: ${ensemble.mean.toFixed(1)} in ± ${ensemble.stddev.toFixed(1)} in (1σ) over the next 48 hours.`
         );
     } catch (error) {
         if (requestId !== snowForecastRequestId) return;
