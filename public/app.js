@@ -2217,7 +2217,11 @@ function openHourlyModal(data) {
 function openDailyModal(data) {
     const modal = document.getElementById('dailyModal');
     modal.classList.add('active');
-    
+
+    // Hide all chart containers during modal animation so Chart.js doesn't
+    // fire resize events while the slide-in is running (causes Y-axis expansion)
+    modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'none');
+
     // Destroy existing charts if they exist
     if (dailyChart) {
         Object.values(dailyChart).forEach(chart => {
@@ -2281,6 +2285,7 @@ function openDailyModal(data) {
     const chartConfig = {
         type: 'line',
         options: {
+            animation: false,
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
@@ -2314,23 +2319,29 @@ function openDailyModal(data) {
                         borderColor: 'rgb(54, 162, 235)',
                         backgroundColor: 'rgba(54, 162, 235, 0.2)',
                         tension: 0.4
-                    },
+                    }
+                ]
+            }
+        }),
+        feelsLike: new Chart(document.getElementById('dailyFeelsLikeChart'), {
+            ...chartConfig,
+            data: {
+                labels,
+                datasets: [
                     {
-                        label: `Feels Like High (${apparentUnit})`,
+                        label: `Feels Like High (${data.daily_units.apparent_temperature_max || data.daily_units.temperature_2m_max})`,
                         data: apparentMaxTemps,
                         borderColor: 'rgb(251, 146, 60)',
                         backgroundColor: 'rgba(251, 146, 60, 0.2)',
                         tension: 0.4,
-                        borderDash: [6, 4],
                         spanGaps: true
                     },
                     {
-                        label: `Feels Like Low (${apparentUnit})`,
+                        label: `Feels Like Low (${data.daily_units.apparent_temperature_min || data.daily_units.temperature_2m_min})`,
                         data: apparentMinTemps,
                         borderColor: 'rgb(56, 189, 248)',
                         backgroundColor: 'rgba(56, 189, 248, 0.2)',
                         tension: 0.4,
-                        borderDash: [6, 4],
                         spanGaps: true
                     }
                 ]
@@ -2536,36 +2547,8 @@ function openDailyModal(data) {
     }
 
     // Temperature toggle: Actual vs Feels Like
-    const dailyTempActualBtn = document.getElementById('dailyTempActualBtn');
-    const dailyTempFeelsLikeBtn = document.getElementById('dailyTempFeelsLikeBtn');
-
-    function setDailyTempMode(mode) {
-        const chart = dailyChart.temp;
-        if (!chart) return;
-        const isActual = mode === 'actual';
-        // datasets: 0=High, 1=Low, 2=FeelsLikeHigh, 3=FeelsLikeLow
-        chart.data.datasets[0].hidden = !isActual;
-        chart.data.datasets[1].hidden = !isActual;
-        chart.data.datasets[2].hidden = isActual;
-        chart.data.datasets[3].hidden = isActual;
-        chart.update();
-
-        dailyTempActualBtn.className = isActual
-            ? 'px-3 py-1 rounded text-sm font-semibold border border-red-500/50 bg-red-500/30 text-white transition-all'
-            : 'px-3 py-1 rounded text-sm font-semibold border border-gray-600/50 bg-gray-700/40 text-gray-400 transition-all';
-        dailyTempFeelsLikeBtn.className = isActual
-            ? 'px-3 py-1 rounded text-sm font-semibold border border-gray-600/50 bg-gray-700/40 text-gray-400 transition-all'
-            : 'px-3 py-1 rounded text-sm font-semibold border border-orange-500/50 bg-orange-500/30 text-white transition-all';
-    }
-
-    dailyTempActualBtn.addEventListener('click', () => setDailyTempMode('actual'));
-    dailyTempFeelsLikeBtn.addEventListener('click', () => setDailyTempMode('feels-like'));
-
-    // Default: show actual temps only
-    setDailyTempMode('actual');
-
-    // Initialize chart selection dropdown
-    initializeChartSelector('dailyChartSelect');
+    // Reveal charts after modal slide-in animation completes (300ms)
+    setTimeout(() => initializeChartSelector('dailyChartSelect'), 320);
 }
 
 // Modal close handlers
