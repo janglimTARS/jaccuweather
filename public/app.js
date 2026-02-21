@@ -1449,7 +1449,7 @@ async function fetchNwsSnowForecast(lat, lon) {
 
     const now = new Date();
     const end48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    let totalCm = 0;
+    let totalMm = 0;
 
     snowfallValues.forEach(entry => {
         const validTime = entry.validTime || '';
@@ -1463,11 +1463,11 @@ async function fetchNwsSnowForecast(lat, lon) {
         const overlap = overlapHours(rangeStart, rangeEnd, now, end48h);
         if (overlap <= 0) return;
 
-        const cmValue = Number(entry.value) || 0;
-        totalCm += cmValue * (overlap / safeDuration);
+        const mmValue = Number(entry.value) || 0; // NWS snowfallAmount UOM is wmoUnit:mm
+        totalMm += mmValue * (overlap / safeDuration);
     });
 
-    return { totalInches: totalCm / 2.54 };
+    return { totalInches: totalMm / 25.4 };
 }
 
 async function fetchEnsembleSnowForecast(lat, lon) {
