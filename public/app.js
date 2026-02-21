@@ -1471,7 +1471,7 @@ async function fetchNwsSnowForecast(lat, lon) {
 }
 
 async function fetchEnsembleSnowForecast(lat, lon) {
-    const url = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&hourly=snowfall&models=gfs_seamless,icon_seamless&timezone=auto`;
+    const url = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&hourly=snowfall&models=gfs_seamless,ecmwf_ifs025&timezone=auto`;
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`Ensemble request failed (${response.status})`);
@@ -1565,7 +1565,7 @@ async function updateSnowForecastForCurrentLocation() {
 
         setSnowForecastResult(
             `${ensemble.low.toFixed(1)} – ${ensemble.high.toFixed(1)} in`,
-            `Likely range (middle 50% of GFS + ICON ensemble members). Mean: ${ensemble.mean.toFixed(1)} in over the next 48 hours.`
+            `Likely range (middle 50% of GFS + ECMWF ensemble members). Mean: ${ensemble.mean.toFixed(1)} in over the next 48 hours.`
         );
     } catch (error) {
         if (requestId !== snowForecastRequestId) return;
