@@ -2535,6 +2535,35 @@ function openDailyModal(data) {
         detailsContainer.appendChild(detailItem);
     }
 
+    // Temperature toggle: Actual vs Feels Like
+    const dailyTempActualBtn = document.getElementById('dailyTempActualBtn');
+    const dailyTempFeelsLikeBtn = document.getElementById('dailyTempFeelsLikeBtn');
+
+    function setDailyTempMode(mode) {
+        const chart = dailyChart.temp;
+        if (!chart) return;
+        const isActual = mode === 'actual';
+        // datasets: 0=High, 1=Low, 2=FeelsLikeHigh, 3=FeelsLikeLow
+        chart.data.datasets[0].hidden = !isActual;
+        chart.data.datasets[1].hidden = !isActual;
+        chart.data.datasets[2].hidden = isActual;
+        chart.data.datasets[3].hidden = isActual;
+        chart.update();
+
+        dailyTempActualBtn.className = isActual
+            ? 'px-3 py-1 rounded text-sm font-semibold border border-red-500/50 bg-red-500/30 text-white transition-all'
+            : 'px-3 py-1 rounded text-sm font-semibold border border-gray-600/50 bg-gray-700/40 text-gray-400 transition-all';
+        dailyTempFeelsLikeBtn.className = isActual
+            ? 'px-3 py-1 rounded text-sm font-semibold border border-gray-600/50 bg-gray-700/40 text-gray-400 transition-all'
+            : 'px-3 py-1 rounded text-sm font-semibold border border-orange-500/50 bg-orange-500/30 text-white transition-all';
+    }
+
+    dailyTempActualBtn.addEventListener('click', () => setDailyTempMode('actual'));
+    dailyTempFeelsLikeBtn.addEventListener('click', () => setDailyTempMode('feels-like'));
+
+    // Default: show actual temps only
+    setDailyTempMode('actual');
+
     // Initialize chart selection dropdown
     initializeChartSelector('dailyChartSelect');
 }
