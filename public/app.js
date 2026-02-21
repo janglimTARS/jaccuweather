@@ -508,7 +508,7 @@ async function fetchWeather(lat, lon) {
 
     try {
         // Make direct request to Open-Meteo from browser (uses user's IP, not shared Cloudflare IP)
-        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,shortwave_radiation&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,shortwave_radiation,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
 
         // Check for rate limiting before parsing JSON
         if (weatherResponse.status === 429) {
@@ -774,7 +774,7 @@ function displayWeather(data) {
         hourItem.className = 'flex flex-col items-center bg-white/10 rounded-lg p-3 backdrop-blur-sm min-w-[80px] clickable';
         hourItem.innerHTML = `
             <div class="text-white/70 text-sm mb-1">${formatTime12Hour(hour)}</div>
-            <div class="text-2xl mb-2">${getWeatherIcon(data.hourly.weather_code[hourIndex])}</div>
+            <div class="text-2xl mb-2">${getWeatherIcon(data.hourly.weather_code[hourIndex], data.hourly.is_day ? data.hourly.is_day[hourIndex] !== 0 : true)}</div>
             <div class="text-white font-bold text-lg">${Math.round(data.hourly.temperature_2m[hourIndex])}${data.hourly_units.temperature_2m}</div>
             <div class="text-white/60 text-xs mt-1">${data.hourly.wind_speed_10m[hourIndex]} ${formatUnit(data.hourly_units.wind_speed_10m)}</div>
         `;
@@ -965,8 +965,25 @@ function displayWeeklySnowTotals(data) {
     });
 }
 
-function getWeatherIcon(code) {
+function getWeatherIcon(code, isDay = true) {
     // WMO Weather interpretation codes
+    // Night variants for clear/partly cloudy conditions
+    if (!isDay) {
+        const nightIcons = {
+            0: '🌙', 1: '🌙', 2: '☁️', 3: '☁️',
+            45: '🌫️', 48: '🌫️',
+            51: '🌧️', 53: '🌧️', 55: '🌧️',
+            56: '🌨️', 57: '🌨️',
+            61: '🌧️', 63: '🌧️', 65: '🌧️',
+            66: '🌨️', 67: '🌨️',
+            71: '❄️', 73: '❄️', 75: '❄️',
+            77: '❄️',
+            80: '🌧️', 81: '🌧️', 82: '🌧️',
+            85: '🌨️', 86: '🌨️',
+            95: '⛈️', 96: '⛈️', 99: '⛈️'
+        };
+        return nightIcons[code] || '🌙';
+    }
     const icons = {
         0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
         45: '🌫️', 48: '🌫️',
@@ -2347,7 +2364,7 @@ function openHourlyModal(data) {
         detailItem.innerHTML = `
                 <div class="flex items-center justify-between mb-2">
                 <div class="text-white font-semibold">${hour.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} ${formatTime12Hour(hour)}</div>
-                <div class="text-2xl">${getWeatherIcon(data.hourly.weather_code[idx])}</div>
+                <div class="text-2xl">${getWeatherIcon(data.hourly.weather_code[idx], data.hourly.is_day ? data.hourly.is_day[idx] !== 0 : true)}</div>
             </div>
             <div class="grid grid-cols-2 gap-2 text-sm">
                 <div><span class="text-white/70">Temp:</span> <span class="text-white font-bold">${Math.round(temps[i])}${data.hourly_units.temperature_2m}</span></div>
