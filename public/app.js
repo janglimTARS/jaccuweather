@@ -309,19 +309,72 @@ document.getElementById('locationInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') handleSearch();
 });
 document.getElementById('locationBtn').addEventListener('click', () => {
-    if (navigator.geolocation) {
+    const btn = document.getElementById('locationBtn');
+
+    if (!navigator.geolocation) {
+        showLocationBtnError(btn, 'Geolocation not supported');
+        return;
+    }
+
+    const doGeolocate = () => {
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+        btn.title = 'Getting your location...';
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
+                btn.innerHTML = '<i class="fas fa-location-arrow"></i>';
+                btn.disabled = false;
+                btn.title = 'Use Current Location';
                 currentLat = position.coords.latitude;
                 currentLon = position.coords.longitude;
+                currentLocationName = null;
                 fetchWeather(currentLat, currentLon);
             },
-            () => showError('Unable to get your location. Please search for a city.')
+            (err) => {
+                btn.innerHTML = '<i class="fas fa-location-arrow"></i>';
+                btn.disabled = false;
+                btn.title = 'Use Current Location';
+                if (err.code === 1) {
+                    showLocationBtnError(btn, 'Location blocked — enable in browser settings');
+                } else if (err.code === 3) {
+                    showLocationBtnError(btn, 'Location timed out — try again');
+                } else {
+                    showLocationBtnError(btn, 'Unable to get location');
+                }
+            },
+            { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }
         );
+    };
+
+    // Check permission status first if Permissions API is available
+    if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+            if (result.state === 'denied') {
+                showLocationBtnError(btn, 'Location blocked — enable in browser settings');
+            } else {
+                doGeolocate();
+            }
+        }).catch(() => doGeolocate());
     } else {
-        showError('Geolocation is not supported by your browser.');
+        doGeolocate();
     }
 });
+
+function showLocationBtnError(btn, msg) {
+    // Show error as a tooltip/badge on the button itself, visible regardless of scroll position
+    const existing = document.getElementById('locationBtnError');
+    if (existing) existing.remove();
+
+    const tooltip = document.createElement('div');
+    tooltip.id = 'locationBtnError';
+    tooltip.style.cssText = 'position:absolute;background:#ef4444;color:#fff;font-size:12px;padding:4px 10px;border-radius:6px;white-space:nowrap;z-index:9999;pointer-events:none;top:calc(100% + 6px);left:50%;transform:translateX(-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4)';
+    tooltip.textContent = msg;
+
+    btn.style.position = 'relative';
+    btn.appendChild(tooltip);
+    setTimeout(() => tooltip.remove(), 4000);
+}
 
 // State abbreviation to full name mapping (US states)
 const STATE_ABBREVIATIONS = {
@@ -455,7 +508,7 @@ async function fetchWeather(lat, lon) {
 
     try {
         // Make direct request to Open-Meteo from browser (uses user's IP, not shared Cloudflare IP)
-        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,uv_index,weather_code,dewpoint_2m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,shortwave_radiation&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
 
         // Check for rate limiting before parsing JSON
         if (weatherResponse.status === 429) {
@@ -2050,6 +2103,10 @@ function openHourlyModal(data) {
     const wind = [];
     const humidity = [];
     const pressure = [];
+    const cloudLow = [];
+    const cloudMid = [];
+    const cloudHigh = [];
+    const shortwaveData = [];
     const labels = [];
     
     for (let i = 0; i < 24 && (startIndex + i) < data.hourly.time.length; i++) {
@@ -2064,7 +2121,14 @@ function openHourlyModal(data) {
         humidity.push(data.hourly.relative_humidity_2m[idx]);
         // Convert hPa to inHg (1 hPa = 0.02953 inHg)
         pressure.push(data.hourly.surface_pressure ? (data.hourly.surface_pressure[idx] * 0.02953).toFixed(2) : null);
+        cloudLow.push(data.hourly.cloud_cover_low ? data.hourly.cloud_cover_low[idx] : 0);
+        cloudMid.push(data.hourly.cloud_cover_mid ? data.hourly.cloud_cover_mid[idx] : 0);
+        cloudHigh.push(data.hourly.cloud_cover_high ? data.hourly.cloud_cover_high[idx] : 0);
+        shortwaveData.push(data.hourly.shortwave_radiation ? data.hourly.shortwave_radiation[idx] : 0);
     }
+
+    const maxRadiation = Math.max(...shortwaveData.filter(v => v !== null && v !== undefined && v > 0), 1);
+    const brightnessData = shortwaveData.map(v => v === null || v === undefined ? 0 : Math.round((v / maxRadiation) * 100));
     
     // Create charts
     const chartConfig = {
@@ -2167,6 +2231,96 @@ function openHourlyModal(data) {
                     fill: true
                 }]
             }
+        }),
+        cloud: new Chart(document.getElementById('hourlyCloudChart'), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Low Clouds',
+                        data: cloudLow,
+                        backgroundColor: 'rgba(100, 116, 139, 0.75)',
+                        stack: 'cloud'
+                    },
+                    {
+                        label: 'Mid Clouds',
+                        data: cloudMid,
+                        backgroundColor: 'rgba(148, 163, 184, 0.7)',
+                        stack: 'cloud'
+                    },
+                    {
+                        label: 'High Clouds',
+                        data: cloudHigh,
+                        backgroundColor: 'rgba(203, 213, 225, 0.65)',
+                        stack: 'cloud'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        stacked: true,
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            color: '#fff',
+                            callback: value => `${value}%`
+                        },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                }
+            }
+        }),
+        brightness: new Chart(document.getElementById('hourlyBrightnessChart'), {
+            type: 'line',
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            color: '#fff',
+                            callback: value => value + '%'
+                        },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                }
+            },
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Brightness (%)',
+                    data: brightnessData,
+                    borderColor: 'rgb(250, 204, 21)',
+                    backgroundColor: 'rgba(250, 204, 21, 0.2)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            }
         })
     };
     
@@ -2241,6 +2395,10 @@ function openDailyModal(data) {
     const precipProb = [];
     const moonPhases = [];
     const dailyPressure = [];
+    const dailyCloudLow = [];
+    const dailyCloudMid = [];
+    const dailyCloudHigh = [];
+    const dailyShortwaveAverage = [];
     const apparentUnit = data.daily_units.apparent_temperature_max || data.daily_units.temperature_2m_max;
     
     // Start from index 2 to skip past 2 days due to past_days=2
@@ -2279,7 +2437,58 @@ function openDailyModal(data) {
         } else {
             dailyPressure.push(null);
         }
+
+        // Calculate daily average cloud cover by altitude band from hourly data
+        if (data.hourly && data.hourly.time && data.hourly.cloud_cover_low && data.hourly.cloud_cover_mid && data.hourly.cloud_cover_high) {
+            const dayStr = data.daily.time[dayIndex];
+            const dayHourlyIndexes = [];
+            for (let h = 0; h < data.hourly.time.length; h++) {
+                if (data.hourly.time[h].startsWith(dayStr)) {
+                    dayHourlyIndexes.push(h);
+                }
+            }
+
+            if (dayHourlyIndexes.length > 0) {
+                const avgCloudLow = dayHourlyIndexes.reduce((sum, h) => sum + (data.hourly.cloud_cover_low[h] ?? 0), 0) / dayHourlyIndexes.length;
+                const avgCloudMid = dayHourlyIndexes.reduce((sum, h) => sum + (data.hourly.cloud_cover_mid[h] ?? 0), 0) / dayHourlyIndexes.length;
+                const avgCloudHigh = dayHourlyIndexes.reduce((sum, h) => sum + (data.hourly.cloud_cover_high[h] ?? 0), 0) / dayHourlyIndexes.length;
+                dailyCloudLow.push(Number(avgCloudLow.toFixed(1)));
+                dailyCloudMid.push(Number(avgCloudMid.toFixed(1)));
+                dailyCloudHigh.push(Number(avgCloudHigh.toFixed(1)));
+            } else {
+                dailyCloudLow.push(0);
+                dailyCloudMid.push(0);
+                dailyCloudHigh.push(0);
+            }
+        } else {
+            dailyCloudLow.push(0);
+            dailyCloudMid.push(0);
+            dailyCloudHigh.push(0);
+        }
+
+        // Calculate daily average shortwave radiation from hourly data
+        if (data.hourly && data.hourly.time && data.hourly.shortwave_radiation) {
+            const dayStr = data.daily.time[dayIndex];
+            const dayHourlyIndexes = [];
+            for (let h = 0; h < data.hourly.time.length; h++) {
+                if (data.hourly.time[h].startsWith(dayStr)) {
+                    dayHourlyIndexes.push(h);
+                }
+            }
+
+            if (dayHourlyIndexes.length > 0) {
+                const avgShortwave = dayHourlyIndexes.reduce((sum, h) => sum + (data.hourly.shortwave_radiation[h] ?? 0), 0) / dayHourlyIndexes.length;
+                dailyShortwaveAverage.push(Number(avgShortwave.toFixed(1)));
+            } else {
+                dailyShortwaveAverage.push(0);
+            }
+        } else {
+            dailyShortwaveAverage.push(0);
+        }
     }
+
+    const maxDailyShortwave = Math.max(...dailyShortwaveAverage.filter(v => v !== null && v !== undefined && v > 0), 1);
+    const dailyBrightnessData = dailyShortwaveAverage.map(v => v === null || v === undefined ? 0 : Math.round((v / maxDailyShortwave) * 100));
     
     // Create charts
     const chartConfig = {
@@ -2395,6 +2604,97 @@ function openDailyModal(data) {
                     data: snowfall,
                     borderColor: 'rgb(173, 216, 230)',
                     backgroundColor: 'rgba(173, 216, 230, 0.3)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            }
+        }),
+        cloud: new Chart(document.getElementById('dailyCloudChart'), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Low Clouds',
+                        data: dailyCloudLow,
+                        backgroundColor: 'rgba(100, 116, 139, 0.75)',
+                        stack: 'cloud'
+                    },
+                    {
+                        label: 'Mid Clouds',
+                        data: dailyCloudMid,
+                        backgroundColor: 'rgba(148, 163, 184, 0.7)',
+                        stack: 'cloud'
+                    },
+                    {
+                        label: 'High Clouds',
+                        data: dailyCloudHigh,
+                        backgroundColor: 'rgba(203, 213, 225, 0.65)',
+                        stack: 'cloud'
+                    }
+                ]
+            },
+            options: {
+                animation: false,
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        stacked: true,
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            color: '#fff',
+                            callback: value => `${value}%`
+                        },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                }
+            }
+        }),
+        brightness: new Chart(document.getElementById('dailyBrightnessChart'), {
+            type: 'line',
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            color: '#fff',
+                            callback: value => value + '%'
+                        },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                }
+            },
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Brightness (%)',
+                    data: dailyBrightnessData,
+                    borderColor: 'rgb(250, 204, 21)',
+                    backgroundColor: 'rgba(250, 204, 21, 0.2)',
                     tension: 0.4,
                     fill: true
                 }]

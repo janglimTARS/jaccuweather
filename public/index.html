@@ -555,6 +555,8 @@
                             <option value="humidity">Humidity</option>
                             <option value="pressure">Pressure</option>
                             <option value="snow">Snowfall</option>
+                            <option value="cloud">Cloud Cover</option>
+                            <option value="brightness">Brightness</option>
                         </select>
                     </div>
                 </div>
@@ -581,6 +583,12 @@
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="snow">
                     <canvas id="hourlySnowChart" style="height: 250px;"></canvas>
                 </div>
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="cloud">
+                    <canvas id="hourlyCloudChart" style="height: 250px;"></canvas>
+                </div>
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="brightness">
+                    <canvas id="hourlyBrightnessChart" style="height: 250px;"></canvas>
+                </div>
                 <div id="hourlyDetails" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Detailed hourly items will be inserted here -->
                 </div>
@@ -605,6 +613,8 @@
                             <option value="wind">Wind Speed</option>
                             <option value="pressure">Pressure</option>
                             <option value="snow">Snowfall</option>
+                            <option value="cloud">Cloud Cover</option>
+                            <option value="brightness">Brightness</option>
                             <option value="moon">Moon Phase</option>
                         </select>
                     </div>
@@ -631,6 +641,12 @@
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="snow">
                     <canvas id="dailySnowChart" style="height: 250px;"></canvas>
+                </div>
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="cloud">
+                    <canvas id="dailyCloudChart" style="height: 250px;"></canvas>
+                </div>
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="brightness">
+                    <canvas id="dailyBrightnessChart" style="height: 250px;"></canvas>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="moon">
                     <canvas id="dailyMoonPhaseChart" style="height: 250px;"></canvas>
