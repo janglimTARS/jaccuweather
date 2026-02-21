@@ -600,6 +600,7 @@
                         <select id="dailyChartSelect" class="bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="all">All Charts</option>
                             <option value="temp">Temperature</option>
+                            <option value="feelslike">Feels Like</option>
                             <option value="precip">Precipitation</option>
                             <option value="wind">Wind Speed</option>
                             <option value="pressure">Pressure</option>
@@ -614,11 +615,10 @@
             </div>
             <div class="space-y-6">
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="temp">
-                    <div class="flex gap-2 mb-3">
-                        <button id="dailyTempActualBtn" class="px-3 py-1 rounded text-sm font-semibold border border-red-500/50 bg-red-500/30 text-white transition-all">Actual</button>
-                        <button id="dailyTempFeelsLikeBtn" class="px-3 py-1 rounded text-sm font-semibold border border-gray-600/50 bg-gray-700/40 text-gray-400 transition-all">Feels Like</button>
-                    </div>
                     <canvas id="dailyTempChart" style="height: 250px;"></canvas>
+                </div>
+                <div class="card rounded-xl p-4 chart-container" data-chart-type="feelslike">
+                    <canvas id="dailyFeelsLikeChart" style="height: 250px;"></canvas>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="precip">
                     <canvas id="dailyPrecipChart" style="height: 250px;"></canvas>
