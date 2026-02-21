@@ -16,9 +16,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "html-minifier-terser": "^7.2.0",
     "sharp": "^0.34.5",
-    "terser": "^5.46.0",
     "wrangler": "^4.54.0"
   }
 }
