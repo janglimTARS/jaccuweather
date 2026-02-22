@@ -7,10 +7,58 @@ let hourlyChart = null;
 let dailyChart = null;
 // Layer switching removed - Ventusky handles layers internally
 
+const US_BOUNDS = {
+    minLat: 24,
+    maxLat: 50,
+    minLon: -125,
+    maxLon: -66
+};
+
 // Format units from API (e.g., "mp/h" -> "mph")
 function formatUnit(unit) {
     if (!unit) return '';
     return unit.replace('mp/h', 'mph');
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isLikelyUsLocation(lat, lon) {
+    return lat >= US_BOUNDS.minLat &&
+        lat <= US_BOUNDS.maxLat &&
+        lon >= US_BOUNDS.minLon &&
+        lon <= US_BOUNDS.maxLon;
+}
+
+async function fetchWith503Retry(url, options = {}, retries = 2) {
+    let attempt = 0;
+    while (attempt <= retries) {
+        const response = await fetch(url, options);
+        if (response.status !== 503 || attempt === retries) {
+            return response;
+        }
+        attempt++;
+        await sleep(1000);
+    }
+}
+
+function extractDurationHours(duration) {
+    if (!duration) return 0;
+    const dayMatch = duration.match(/(\d+)D/);
+    const hourMatch = duration.match(/(\d+)H/);
+    const minuteMatch = duration.match(/(\d+)M/);
+    const days = dayMatch ? Number(dayMatch[1]) : 0;
+    const hours = hourMatch ? Number(hourMatch[1]) : 0;
+    const minutes = minuteMatch ? Number(minuteMatch[1]) : 0;
+    return days * 24 + hours + (minutes / 60);
+}
+
+function overlapHours(rangeStart, rangeEnd, targetStart, targetEnd) {
+    const start = Math.max(rangeStart.getTime(), targetStart.getTime());
+    const end = Math.min(rangeEnd.getTime(), targetEnd.getTime());
+    if (end <= start) return 0;
+    return (end - start) / (1000 * 60 * 60);
 }
 
 // Favorites management using IndexedDB (more persistent than localStorage)
@@ -502,6 +550,8 @@ async function handleSearch() {
 }
 
 async function fetchWeather(lat, lon) {
+    currentLat = lat;
+    currentLon = lon;
     showLoading();
     hideError();
     hideContent();
@@ -841,7 +891,7 @@ function displayWeather(data) {
     }
 }
 
-function displayWeeklySnowTotals(data) {
+async function displayWeeklySnowTotals(data) {
     const snowSection = document.getElementById('weeklySnowSection');
     const snowContent = document.getElementById('weeklySnowContent');
     snowContent.innerHTML = '';
@@ -935,7 +985,6 @@ function displayWeeklySnowTotals(data) {
         if (period.days.length === 1) {
             // Single day
             const day = period.days[0];
-            const dayUnit = day.snowfall === 1.0 ? 'inch' : 'inches';
             periodText = `Snowfall on ${day.dayName} (${day.dateStr}) is ${totalSnowRounded.toFixed(1)} ${unit}`;
             
             periodItem.innerHTML = `
@@ -963,6 +1012,18 @@ function displayWeeklySnowTotals(data) {
         
         snowContent.appendChild(periodItem);
     });
+
+    try {
+        const nws = await fetchNwsSnowForecast(currentLat, currentLon);
+        if (!nws.unavailable && nws.totalInches >= 0.1) {
+            const nwsLine = document.createElement('p');
+            nwsLine.className = 'text-gray-400 text-sm mt-3';
+            nwsLine.textContent = `NWS 48h forecast: ${nws.totalInches.toFixed(1)} in`;
+            snowContent.appendChild(nwsLine);
+        }
+    } catch (error) {
+        console.error('NWS weekly snow line error:', error);
+    }
 }
 
 function getWeatherIcon(code, isDay = true) {
@@ -1355,6 +1416,71 @@ function displayPrecipitationTiming(data) {
         }
         section.classList.remove('hidden');
     }
+}
+
+async function fetchNwsSnowForecast(lat, lon) {
+    if (!isLikelyUsLocation(lat, lon)) {
+        return {
+            unavailable: true,
+            message: 'NWS data not available for this location'
+        };
+    }
+
+    const pointsResponse = await fetchWith503Retry(
+        `https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`
+    );
+
+    if (!pointsResponse.ok) {
+        if (pointsResponse.status === 404) {
+            return {
+                unavailable: true,
+                message: 'NWS data not available for this location'
+            };
+        }
+        throw new Error(`NWS points request failed (${pointsResponse.status})`);
+    }
+
+    const pointsData = await pointsResponse.json();
+    const gridUrl = pointsData?.properties?.forecastGridData;
+    if (!gridUrl) {
+        return {
+            unavailable: true,
+            message: 'NWS data not available for this location'
+        };
+    }
+
+    const gridResponse = await fetchWith503Retry(gridUrl);
+    if (!gridResponse.ok) {
+        throw new Error(`NWS grid request failed (${gridResponse.status})`);
+    }
+
+    const gridData = await gridResponse.json();
+    const snowfallValues = gridData?.properties?.snowfallAmount?.values || [];
+    if (!snowfallValues.length) {
+        return { totalInches: 0 };
+    }
+
+    const now = new Date();
+    const end48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    let totalMm = 0;
+
+    snowfallValues.forEach(entry => {
+        const validTime = entry.validTime || '';
+        const [startIso, durationIso = 'PT0H'] = validTime.split('/');
+        const rangeStart = startIso ? new Date(startIso) : null;
+        if (!rangeStart || Number.isNaN(rangeStart.getTime())) return;
+
+        const durationHours = extractDurationHours(durationIso || entry.period);
+        const safeDuration = durationHours > 0 ? durationHours : 1;
+        const rangeEnd = new Date(rangeStart.getTime() + safeDuration * 60 * 60 * 1000);
+        const overlap = overlapHours(rangeStart, rangeEnd, now, end48h);
+        if (overlap <= 0) return;
+
+        const mmValue = Number(entry.value) || 0; // NWS snowfallAmount UOM is wmoUnit:mm
+        totalMm += mmValue * (overlap / safeDuration);
+    });
+
+    return { totalInches: totalMm / 25.4 };
 }
 
 function showLoading() {
@@ -3014,4 +3140,3 @@ function updateVentuskyLocation(lat, lon) {
         ventuskyFrame.src = ventuskyUrl;
     }
 }
-
