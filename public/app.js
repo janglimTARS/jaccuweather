@@ -31,6 +31,36 @@ function isLikelyUsLocation(lat, lon) {
         lon <= US_BOUNDS.maxLon;
 }
 
+async function fetchWith503Retry(url, options = {}, retries = 2) {
+    let attempt = 0;
+    while (attempt <= retries) {
+        const response = await fetch(url, options);
+        if (response.status !== 503 || attempt === retries) {
+            return response;
+        }
+        attempt++;
+        await sleep(1000);
+    }
+}
+
+function extractDurationHours(duration) {
+    if (!duration) return 0;
+    const dayMatch = duration.match(/(\d+)D/);
+    const hourMatch = duration.match(/(\d+)H/);
+    const minuteMatch = duration.match(/(\d+)M/);
+    const days = dayMatch ? Number(dayMatch[1]) : 0;
+    const hours = hourMatch ? Number(hourMatch[1]) : 0;
+    const minutes = minuteMatch ? Number(minuteMatch[1]) : 0;
+    return days * 24 + hours + (minutes / 60);
+}
+
+function overlapHours(rangeStart, rangeEnd, targetStart, targetEnd) {
+    const start = Math.max(rangeStart.getTime(), targetStart.getTime());
+    const end = Math.min(rangeEnd.getTime(), targetEnd.getTime());
+    if (end <= start) return 0;
+    return (end - start) / (1000 * 60 * 60);
+}
+
 // Favorites management using IndexedDB (more persistent than localStorage)
 let favoritesDB = null;
 
