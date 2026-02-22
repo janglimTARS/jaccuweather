@@ -5,8 +5,6 @@ let currentWeatherData = null; // Store full weather data for modals
 let favorites = []; // Array of favorite locations
 let hourlyChart = null;
 let dailyChart = null;
-let snowForecastSource = localStorage.getItem('snowForecastSource') || 'nws';
-let snowForecastRequestId = 0;
 // Layer switching removed - Ventusky handles layers internally
 
 const US_BOUNDS = {
@@ -31,87 +29,6 @@ function isLikelyUsLocation(lat, lon) {
         lat <= US_BOUNDS.maxLat &&
         lon >= US_BOUNDS.minLon &&
         lon <= US_BOUNDS.maxLon;
-}
-
-function getSnowForecastElements() {
-    return {
-        nwsBtn: document.getElementById('snowSourceNws'),
-        ensembleBtn: document.getElementById('snowSourceEnsemble'),
-        description: document.getElementById('snowForecastSourceDescription'),
-        loading: document.getElementById('snowForecastLoading'),
-        result: document.getElementById('snowForecastResult'),
-        meta: document.getElementById('snowForecastMeta')
-    };
-}
-
-function updateSnowSourceToggleUi() {
-    const { nwsBtn, ensembleBtn, description } = getSnowForecastElements();
-    if (!nwsBtn || !ensembleBtn || !description) return;
-
-    const usingNws = snowForecastSource === 'nws';
-    nwsBtn.classList.toggle('active', usingNws);
-    ensembleBtn.classList.toggle('active', !usingNws);
-    description.textContent = usingNws
-        ? 'NWS Forecast: US National Weather Service quantitative snowfall guidance (next 48h total).'
-        : 'Ensemble Forecast: Multi-member snowfall spread (p10-p90, median) from Open-Meteo ensemble.';
-}
-
-function showSnowForecastLoading(isLoading) {
-    const { loading, result, meta } = getSnowForecastElements();
-    if (!loading || !result || !meta) return;
-    loading.classList.toggle('hidden', !isLoading);
-    if (isLoading) {
-        result.textContent = '';
-        meta.textContent = '';
-    }
-}
-
-function setSnowForecastResult(text, metaText = '') {
-    const { result, meta } = getSnowForecastElements();
-    if (!result || !meta) return;
-    result.textContent = text;
-    meta.textContent = metaText;
-}
-
-async function fetchWith503Retry(url, options = {}, retries = 2) {
-    let attempt = 0;
-    while (attempt <= retries) {
-        const response = await fetch(url, options);
-        if (response.status !== 503 || attempt === retries) {
-            return response;
-        }
-        attempt++;
-        await sleep(1000);
-    }
-}
-
-function extractDurationHours(duration) {
-    if (!duration) return 0;
-    const dayMatch = duration.match(/(\d+)D/);
-    const hourMatch = duration.match(/(\d+)H/);
-    const minuteMatch = duration.match(/(\d+)M/);
-    const days = dayMatch ? Number(dayMatch[1]) : 0;
-    const hours = hourMatch ? Number(hourMatch[1]) : 0;
-    const minutes = minuteMatch ? Number(minuteMatch[1]) : 0;
-    return days * 24 + hours + (minutes / 60);
-}
-
-function overlapHours(rangeStart, rangeEnd, targetStart, targetEnd) {
-    const start = Math.max(rangeStart.getTime(), targetStart.getTime());
-    const end = Math.min(rangeEnd.getTime(), targetEnd.getTime());
-    if (end <= start) return 0;
-    return (end - start) / (1000 * 60 * 60);
-}
-
-function percentile(sortedValues, p) {
-    if (!sortedValues.length) return 0;
-    if (sortedValues.length === 1) return sortedValues[0];
-    const index = (sortedValues.length - 1) * p;
-    const lower = Math.floor(index);
-    const upper = Math.ceil(index);
-    if (lower === upper) return sortedValues[lower];
-    const weight = index - lower;
-    return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
 }
 
 // Favorites management using IndexedDB (more persistent than localStorage)
@@ -363,20 +280,6 @@ window.addEventListener('message', (event) => {
 
 // Initialize with user's location or default
 window.addEventListener('DOMContentLoaded', () => {
-    if (snowForecastSource !== 'nws' && snowForecastSource !== 'ensemble') {
-        snowForecastSource = 'nws';
-        localStorage.setItem('snowForecastSource', snowForecastSource);
-    }
-
-    updateSnowSourceToggleUi();
-
-    const snowSourceNwsBtn = document.getElementById('snowSourceNws');
-    const snowSourceEnsembleBtn = document.getElementById('snowSourceEnsemble');
-    if (snowSourceNwsBtn && snowSourceEnsembleBtn) {
-        snowSourceNwsBtn.addEventListener('click', () => handleSnowSourceChange('nws'));
-        snowSourceEnsembleBtn.addEventListener('click', () => handleSnowSourceChange('ensemble'));
-    }
-
     loadFavorites();
     
     // Favorites button click handler
@@ -651,7 +554,6 @@ async function fetchWeather(lat, lon) {
 
         currentWeatherData = weatherData; // Store for modals
         displayWeather(weatherData);
-        updateSnowForecastForCurrentLocation();
         
         // Initialize Ventusky radar
         initializeVentuskyRadar(lat, lon);
@@ -906,7 +808,7 @@ function displayWeather(data) {
     }
 }
 
-function displayWeeklySnowTotals(data) {
+async function displayWeeklySnowTotals(data) {
     const snowSection = document.getElementById('weeklySnowSection');
     const snowContent = document.getElementById('weeklySnowContent');
     snowContent.innerHTML = '';
@@ -1000,7 +902,6 @@ function displayWeeklySnowTotals(data) {
         if (period.days.length === 1) {
             // Single day
             const day = period.days[0];
-            const dayUnit = day.snowfall === 1.0 ? 'inch' : 'inches';
             periodText = `Snowfall on ${day.dayName} (${day.dateStr}) is ${totalSnowRounded.toFixed(1)} ${unit}`;
             
             periodItem.innerHTML = `
@@ -1028,6 +929,18 @@ function displayWeeklySnowTotals(data) {
         
         snowContent.appendChild(periodItem);
     });
+
+    try {
+        const nws = await fetchNwsSnowForecast(currentLat, currentLon);
+        if (!nws.unavailable && nws.totalInches >= 0.1) {
+            const nwsLine = document.createElement('p');
+            nwsLine.className = 'text-gray-400 text-sm mt-3';
+            nwsLine.textContent = `NWS 48h forecast: ${nws.totalInches.toFixed(1)} in`;
+            snowContent.appendChild(nwsLine);
+        }
+    } catch (error) {
+        console.error('NWS weekly snow line error:', error);
+    }
 }
 
 function getWeatherIcon(code) {
@@ -1468,124 +1381,6 @@ async function fetchNwsSnowForecast(lat, lon) {
     });
 
     return { totalInches: totalMm / 25.4 };
-}
-
-async function fetchEnsembleSnowForecast(lat, lon) {
-    const url = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&hourly=snowfall&models=gfs_seamless,ecmwf_ifs025&timezone=auto`;
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Ensemble request failed (${response.status})`);
-    }
-
-    const data = await response.json();
-    const hourly = data?.hourly;
-    if (!hourly?.time?.length) {
-        return { p10: 0, p50: 0, p90: 0 };
-    }
-
-    const now = new Date();
-    const end48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    const inWindowIndexes = [];
-
-    for (let i = 0; i < hourly.time.length; i++) {
-        const pointTime = new Date(hourly.time[i]);
-        if (pointTime >= now && pointTime <= end48h) {
-            inWindowIndexes.push(i);
-        }
-    }
-
-    const memberKeys = Object.keys(hourly).filter(key => key.startsWith('snowfall_member'));
-    if (!memberKeys.length || !inWindowIndexes.length) {
-        return { mean: 0, low: 0, high: 0 };
-    }
-
-    const totalsInches = memberKeys.map(key => {
-        const values = hourly[key] || [];
-        let totalCm = 0;
-        inWindowIndexes.forEach(idx => {
-            totalCm += Number(values[idx]) || 0;
-        });
-        return totalCm / 2.54;
-    });
-
-    const sorted = [...totalsInches].sort((a, b) => a - b);
-    const n = sorted.length;
-    const mean = totalsInches.reduce((a, b) => a + b, 0) / n;
-
-    function pct(arr, p) {
-        const idx = p * (arr.length - 1);
-        const lo = Math.floor(idx);
-        const hi = Math.ceil(idx);
-        return lo === hi ? arr[lo] : arr[lo] + (arr[hi] - arr[lo]) * (idx - lo);
-    }
-
-    return {
-        mean,
-        low: Math.max(0, pct(sorted, 0.25)),
-        high: pct(sorted, 0.75)
-    };
-}
-
-async function updateSnowForecastForCurrentLocation() {
-    if (currentLat === null || currentLon === null) return;
-
-    const requestId = ++snowForecastRequestId;
-    updateSnowSourceToggleUi();
-    showSnowForecastLoading(true);
-
-    try {
-        if (snowForecastSource === 'nws') {
-            const nws = await fetchNwsSnowForecast(currentLat, currentLon);
-            if (requestId !== snowForecastRequestId) return;
-
-            if (nws.unavailable) {
-                setSnowForecastResult(nws.message, 'Switch to Ensemble for global coverage.');
-                return;
-            }
-
-            if (nws.totalInches < 0.1) {
-                setSnowForecastResult('No snow expected in the next 48 hours', 'Source: NWS Forecast');
-                return;
-            }
-
-            setSnowForecastResult(
-                `NWS Forecast: ${nws.totalInches.toFixed(1)} in`,
-                'Total expected snowfall over the next 48 hours.'
-            );
-            return;
-        }
-
-        const ensemble = await fetchEnsembleSnowForecast(currentLat, currentLon);
-        if (requestId !== snowForecastRequestId) return;
-
-        if (ensemble.high < 0.1) {
-            setSnowForecastResult('No snow expected in the next 48 hours', 'Source: Ensemble Forecast');
-            return;
-        }
-
-        setSnowForecastResult(
-            `${ensemble.low.toFixed(1)} – ${ensemble.high.toFixed(1)} in`,
-            `Likely range (middle 50% of GFS + ECMWF ensemble members). Mean: ${ensemble.mean.toFixed(1)} in over the next 48 hours.`
-        );
-    } catch (error) {
-        if (requestId !== snowForecastRequestId) return;
-        console.error('Snow forecast error:', error);
-        setSnowForecastResult('Snow forecast unavailable right now', 'Please try again in a moment.');
-    } finally {
-        if (requestId === snowForecastRequestId) {
-            showSnowForecastLoading(false);
-        }
-    }
-}
-
-function handleSnowSourceChange(source) {
-    if (source !== 'nws' && source !== 'ensemble') return;
-    if (snowForecastSource === source) return;
-
-    snowForecastSource = source;
-    localStorage.setItem('snowForecastSource', source);
-    updateSnowSourceToggleUi();
-    updateSnowForecastForCurrentLocation();
 }
 
 function showLoading() {
