@@ -3047,50 +3047,75 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Ventusky Radar functionality
-function initializeVentuskyRadar(lat, lon) {
-    // Build Ventusky URL with location parameters
-    // Format: https://www.ventusky.com/precipitation-map?p=[lat];[lon];[zoom]&l=[layer]
-    // Using precipitation map as default - users can change layers within Ventusky
-    // Zoom level 8 shows approximately 50 miles x 50 miles
-    // Use slightly lower zoom on mobile to show more area (zoomed out by one level)
+function buildVentuskyUrl(lat, lon) {
     const isMobile = window.innerWidth <= 768;
     const zoom = isMobile ? 7 : 8; // Lower zoom on mobile (more zoomed out)
-    // Use proxy route to request desktop version (removes download app button)
-    const ventuskyUrl = `/ventusky-proxy/precipitation-map?p=${lat};${lon};${zoom}&l=rain`;
-    
+    return `/ventusky-proxy/precipitation-map?p=${lat};${lon};${zoom}&l=rain`;
+}
+
+function setRadarFallback(visible, lat, lon) {
+    const fallback = document.getElementById('radarFallback');
+    const fallbackLink = document.getElementById('radarFallbackLink');
+    if (!fallback || !fallbackLink) return;
+
+    const directUrl = `https://www.ventusky.com/precipitation-map?p=${lat};${lon};7&l=rain`;
+    fallbackLink.href = directUrl;
+    fallback.classList.toggle('hidden', !visible);
+}
+
+function initializeVentuskyRadar(lat, lon) {
+    // Build Ventusky URL with location parameters
+    const ventuskyUrl = buildVentuskyUrl(lat, lon);
+
     // Set iframe source
     const ventuskyFrame = document.getElementById('ventuskyFrame');
     if (ventuskyFrame) {
-        ventuskyFrame.src = ventuskyUrl;
-        
-        // Prevent iframe from opening in new tab
-        ventuskyFrame.addEventListener('load', () => {
-            try {
-                // Try to access iframe content to prevent new tab opens
-                // This may fail due to cross-origin restrictions, but we'll try
-                const iframeWindow = ventuskyFrame.contentWindow;
-                if (iframeWindow) {
-                    // Override window.open if possible
-                    iframeWindow.open = function() {
-                        console.log('Blocked iframe window.open');
-                        return null;
-                    };
+        setRadarFallback(false, lat, lon);
+
+        // Set handlers once to avoid listener pileups on repeated weather fetches
+        if (!ventuskyFrame.dataset.handlersAttached) {
+            ventuskyFrame.addEventListener('load', () => {
+                // If we got a load event, hide fallback
+                setRadarFallback(false, currentLat || lat, currentLon || lon);
+                try {
+                    // Try to access iframe content to prevent new tab opens
+                    const iframeWindow = ventuskyFrame.contentWindow;
+                    if (iframeWindow) {
+                        iframeWindow.open = function() {
+                            console.log('Blocked iframe window.open');
+                            return null;
+                        };
+                    }
+                } catch (e) {
+                    // Cross-origin restrictions prevent this, expected
                 }
-            } catch (e) {
-                // Cross-origin restrictions prevent this, which is expected
-            }
-        });
+            });
+
+            ventuskyFrame.addEventListener('error', () => {
+                setRadarFallback(true, currentLat || lat, currentLon || lon);
+            });
+
+            ventuskyFrame.dataset.handlersAttached = '1';
+        }
+
+        // If iframe stays blank (known on some Windows setups), show fallback link
+        if (window.radarLoadTimeout) clearTimeout(window.radarLoadTimeout);
+        window.radarLoadTimeout = setTimeout(() => {
+            setRadarFallback(true, currentLat || lat, currentLon || lon);
+        }, 8000);
+
+        ventuskyFrame.src = ventuskyUrl;
     }
-    
+
     // Prevent container clicks and scroll events from opening new tabs
     const radarContainer = document.getElementById('radarContainer');
     const ventuskyContainer = document.getElementById('ventuskyContainer');
-    
-    if (radarContainer) {
+
+    if (radarContainer && !radarContainer.dataset.guardsAttached) {
         // Track if user is scrolling to prevent accidental interactions
         let scrollTimeout;
         let isUserScrolling = false;
-        
+
         // Monitor page scroll to detect when user is actively scrolling
         window.addEventListener('scroll', () => {
             isUserScrolling = true;
@@ -3099,7 +3124,7 @@ function initializeVentuskyRadar(lat, lon) {
                 isUserScrolling = false;
             }, 300);
         }, { passive: true });
-        
+
         // Prevent clicks during or right after scrolling
         radarContainer.addEventListener('click', (e) => {
             if (isUserScrolling) {
@@ -3115,7 +3140,7 @@ function initializeVentuskyRadar(lat, lon) {
                 return false;
             }
         }, { passive: false, capture: true });
-        
+
         // Prevent focus events that might trigger new tabs
         radarContainer.addEventListener('focusin', (e) => {
             if (isUserScrolling) {
@@ -3123,20 +3148,17 @@ function initializeVentuskyRadar(lat, lon) {
                 e.stopPropagation();
             }
         }, { capture: true });
+
+        radarContainer.dataset.guardsAttached = '1';
     }
 }
 
 function updateVentuskyLocation(lat, lon) {
-    // Update iframe URL when location changes
-    // Zoom level 8 shows approximately 50 miles x 50 miles on desktop
-    // Use slightly lower zoom on mobile to show more area (zoomed out by one level)
-    const isMobile = window.innerWidth <= 768;
-    const zoom = isMobile ? 7 : 8; // Lower zoom on mobile (more zoomed out)
-    // Use proxy route to request desktop version (removes download app button)
-    const ventuskyUrl = `/ventusky-proxy/precipitation-map?p=${lat};${lon};${zoom}&l=rain`;
-    
+    const ventuskyUrl = buildVentuskyUrl(lat, lon);
+
     const ventuskyFrame = document.getElementById('ventuskyFrame');
     if (ventuskyFrame) {
+        setRadarFallback(false, lat, lon);
         ventuskyFrame.src = ventuskyUrl;
     }
 }
