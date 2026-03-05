@@ -6,8 +6,6 @@ let favorites = []; // Array of favorite locations
 let hourlyChart = null;
 let dailyChart = null;
 let mobileActiveTab = 'now';
-let radarDesktopParent = null;
-let radarDesktopNextSibling = null;
 let currentAlerts = [];
 let currentAirQualityData = null;
 // Layer switching removed - Ventusky handles layers internally
@@ -361,9 +359,7 @@ function setMobileTab(tabName) {
         panel.classList.toggle('active', panel.dataset.mobilePanel === tabName);
     });
 
-    if (tabName === 'radar') {
-        syncRadarContainerForViewport();
-    }
+    syncRadarContainerForViewport();
 }
 
 function toggleMobileSearch(forceOpen = null) {
@@ -418,27 +414,39 @@ function getHourlyStartIndex(data) {
 }
 
 function syncRadarContainerForViewport() {
-    const radarContainer = document.getElementById('radarContainer');
-    const radarSection = document.getElementById('radarSection');
     const mobileMount = document.getElementById('mobileRadarMount');
+    if (!mobileMount) return;
 
-    if (!radarContainer || !radarSection || !mobileMount) return;
-
-    if (!radarDesktopParent) {
-        radarDesktopParent = radarContainer.parentElement;
-        radarDesktopNextSibling = radarContainer.nextElementSibling;
+    const shouldShowMobileRadar = isMobileViewport() && mobileActiveTab === 'radar';
+    if (!shouldShowMobileRadar) {
+        mobileMount.innerHTML = '';
+        return;
     }
 
-    if (isMobileViewport()) {
-        if (radarContainer.parentElement !== mobileMount) {
-            mobileMount.appendChild(radarContainer);
-        }
-    } else if (radarDesktopParent && radarContainer.parentElement !== radarDesktopParent) {
-        if (radarDesktopNextSibling && radarDesktopNextSibling.parentElement === radarDesktopParent) {
-            radarDesktopParent.insertBefore(radarContainer, radarDesktopNextSibling);
-        } else {
-            radarDesktopParent.appendChild(radarContainer);
-        }
+    const desktopFrame = document.getElementById('ventuskyFrame');
+    const iframeSrc = desktopFrame?.src || ((currentLat !== null && currentLon !== null) ? buildVentuskyUrl(currentLat, currentLon) : '');
+    if (!iframeSrc) {
+        mobileMount.innerHTML = '';
+        return;
+    }
+
+    let mobileFrame = document.getElementById('mobileVentuskyFrame');
+    if (!mobileFrame) {
+        mobileMount.innerHTML = '';
+        const mobileContainer = document.createElement('div');
+        mobileContainer.className = 'ventusky-iframe-container mobile-radar-iframe-container';
+        mobileFrame = document.createElement('iframe');
+        mobileFrame.id = 'mobileVentuskyFrame';
+        mobileFrame.style.border = 'none';
+        mobileFrame.allowFullscreen = true;
+        mobileFrame.loading = 'lazy';
+        mobileFrame.referrerPolicy = 'no-referrer-when-downgrade';
+        mobileContainer.appendChild(mobileFrame);
+        mobileMount.appendChild(mobileContainer);
+    }
+
+    if (mobileFrame.src !== iframeSrc) {
+        mobileFrame.src = iframeSrc;
     }
 }
 
@@ -1140,17 +1148,24 @@ function renderMobileUI(data) {
         { label: 'AQI', value: aqiValue !== undefined && aqiValue !== null ? `${aqiValue}` : '--' },
         { label: 'Sinus', value: sinusRisk },
         { label: 'Allergy', value: allergyRisk },
-        { label: 'Moon', value: moonPhase.name }
+        { label: 'Moon', value: moonPhase.name, key: 'moon' }
     ];
 
     const metricsContainer = document.getElementById('mobileNowMetrics');
     if (metricsContainer) {
         metricsContainer.innerHTML = metrics.map((metric) => `
-            <div class="mobile-metric-pill">
+            <div class="mobile-metric-pill"${metric.key ? ` data-mobile-metric="${metric.key}"` : ''}>
                 <div class="mobile-metric-label">${metric.label}</div>
                 <div class="mobile-metric-value">${metric.value}</div>
             </div>
         `).join('');
+
+        const mobileMoonMetric = metricsContainer.querySelector('[data-mobile-metric="moon"]');
+        if (mobileMoonMetric) {
+            const moonDate = currentWeatherData?.daily?.time?.[2] ? parseDateString(currentWeatherData.daily.time[2]) : new Date();
+            mobileMoonMetric.style.cursor = 'pointer';
+            mobileMoonMetric.addEventListener('click', () => openMoonDetailsModal(moonDate));
+        }
     }
 
     if (data.daily && data.daily.sunrise && data.daily.sunrise[0]) {
@@ -1192,13 +1207,13 @@ function renderMobileUI(data) {
 
             const row = document.createElement('button');
             row.type = 'button';
-            row.className = 'mobile-hour-row';
+            row.className = 'mobile-hour-row mobile-forecast-row';
             row.innerHTML = `
-                <span class="mobile-hour-time">${hourTime.toLocaleDateString('en-US', { weekday: 'short' })} ${formatTime12Hour(hourTime).replace(':00', '')}</span>
-                <span class="mobile-hour-icon">${getWeatherIcon(data.hourly.weather_code[idx], data.hourly.is_day ? data.hourly.is_day[idx] !== 0 : true)}</span>
-                <span class="mobile-hour-temp">${Math.round(data.hourly.temperature_2m[idx])}${data.hourly_units.temperature_2m}</span>
-                <span class="mobile-hour-precip">${precipChance}</span>
-                <span class="mobile-hour-wind">${data.hourly.wind_speed_10m[idx]} ${formatUnit(data.hourly_units.wind_speed_10m)}</span>
+                <span class="mobile-hour-time mobile-forecast-label">${hourTime.toLocaleDateString('en-US', { weekday: 'short' })} ${formatTime12Hour(hourTime).replace(':00', '')}</span>
+                <span class="mobile-hour-icon mobile-forecast-icon">${getWeatherIcon(data.hourly.weather_code[idx], data.hourly.is_day ? data.hourly.is_day[idx] !== 0 : true)}</span>
+                <span class="mobile-hour-temp mobile-forecast-temp">${Math.round(data.hourly.temperature_2m[idx])}${data.hourly_units.temperature_2m}</span>
+                <span class="mobile-hour-precip mobile-forecast-secondary">${precipChance}</span>
+                <span class="mobile-hour-wind mobile-forecast-secondary">${data.hourly.wind_speed_10m[idx]} ${formatUnit(data.hourly_units.wind_speed_10m)}</span>
             `;
             row.addEventListener('click', () => openHourlyModal(data));
             hourlyList.appendChild(row);
@@ -1217,14 +1232,14 @@ function renderMobileUI(data) {
 
             const row = document.createElement('button');
             row.type = 'button';
-            row.className = 'mobile-day-row';
+            row.className = 'mobile-day-row mobile-forecast-row';
             row.innerHTML = `
-                <span>${day.toLocaleDateString('en-US', { weekday: 'short' }).replace(',', '')} ${day.getMonth() + 1}/${day.getDate()}</span>
-                <span>${getWeatherIcon(data.daily.weather_code[dayIndex])}</span>
-                <span class="mobile-day-hi-lo">${Math.round(data.daily.temperature_2m_max[dayIndex])}${data.daily_units.temperature_2m_max}/${Math.round(data.daily.temperature_2m_min[dayIndex])}${data.daily_units.temperature_2m_min}</span>
+                <span class="mobile-forecast-label">${day.toLocaleDateString('en-US', { weekday: 'short' }).replace(',', '')} ${day.getMonth() + 1}/${day.getDate()}</span>
+                <span class="mobile-forecast-icon">${getWeatherIcon(data.daily.weather_code[dayIndex])}</span>
+                <span class="mobile-day-hi-lo mobile-forecast-temp">${Math.round(data.daily.temperature_2m_max[dayIndex])}${data.daily_units.temperature_2m_max}/${Math.round(data.daily.temperature_2m_min[dayIndex])}${data.daily_units.temperature_2m_min}</span>
                 <span class="mobile-precip-track">
                     <span class="mobile-precip-fill" style="width: ${Math.max(0, Math.min(100, precipProb))}%;"></span>
-                    <span class="mobile-precip-label">${precipProb}%</span>
+                    <span class="mobile-precip-label mobile-forecast-secondary">${precipProb}%</span>
                 </span>
             `;
             row.addEventListener('click', () => openDailyModal(data));
@@ -3518,6 +3533,7 @@ function initializeVentuskyRadar(lat, lon) {
 
         ventuskyFrame.src = ventuskyUrl;
     }
+    syncRadarContainerForViewport();
 
     // Prevent container clicks and scroll events from opening new tabs
     const radarContainer = document.getElementById('radarContainer');
@@ -3573,4 +3589,5 @@ function updateVentuskyLocation(lat, lon) {
         setRadarFallback(false, lat, lon);
         ventuskyFrame.src = ventuskyUrl;
     }
+    syncRadarContainerForViewport();
 }

@@ -648,28 +648,49 @@
                 padding-bottom: 0.3rem;
             }
 
-            .mobile-hour-row,
-            .mobile-day-row {
+            .mobile-forecast-row {
                 border-radius: 0.9rem;
                 border: 1px solid rgba(148, 163, 184, 0.22);
                 background: rgba(15, 23, 42, 0.8);
                 color: #f8fafc;
+                align-items: center;
+                min-height: 52px;
+                padding: 0 0.7rem;
+                white-space: nowrap;
+            }
+
+            .mobile-forecast-label {
+                color: #cbd5e1;
+                font-size: 0.85rem;
+                letter-spacing: 0.01em;
+            }
+
+            .mobile-forecast-icon {
+                width: 24px;
+                font-size: 1.5rem;
+                line-height: 1;
+                text-align: center;
+            }
+
+            .mobile-forecast-temp {
+                font-size: 1rem;
+                font-weight: 700;
+                color: #f8fafc;
+                text-align: center;
+            }
+
+            .mobile-forecast-secondary {
+                font-size: 0.75rem;
             }
 
             .mobile-hour-row {
                 display: grid;
                 grid-template-columns: 82px 24px 48px 44px 1fr;
-                align-items: center;
                 gap: 0.35rem;
-                padding: 0.65rem 0.7rem;
-                font-size: 0.78rem;
-                white-space: nowrap;
             }
 
             .mobile-hour-time {
-                color: #cbd5e1;
-                font-size: 0.72rem;
-                letter-spacing: 0.01em;
+                text-align: left;
             }
 
             .mobile-hour-icon,
@@ -680,7 +701,7 @@
             }
 
             .mobile-hour-temp {
-                font-weight: 600;
+                text-align: center;
             }
 
             .mobile-hour-precip {
@@ -689,21 +710,15 @@
 
             .mobile-hour-wind {
                 color: #94a3b8;
-                font-size: 0.72rem;
             }
 
             .mobile-day-row {
                 display: grid;
                 grid-template-columns: 90px 24px 74px 1fr;
-                align-items: center;
                 gap: 0.4rem;
-                padding: 0.75rem 0.7rem;
-                font-size: 0.82rem;
             }
 
             .mobile-day-hi-lo {
-                font-weight: 600;
-                font-size: 0.8rem;
                 color: #e2e8f0;
             }
 
@@ -727,7 +742,7 @@
                 top: -18px;
                 right: 0;
                 color: #cbd5e1;
-                font-size: 0.65rem;
+                font-size: 0.75rem;
             }
 
             #mobileTabRadar {
@@ -735,24 +750,23 @@
                 overflow: hidden;
             }
 
-            #mobileRadarMount #radarContainer {
+            #mobileRadarMount {
+                width: 100vw;
+                max-width: 100vw;
+            }
+
+            #mobileRadarMount .mobile-radar-iframe-container {
                 width: 100vw;
                 max-width: 100vw;
                 margin: 0;
                 padding: 0;
             }
 
-            #mobileRadarMount #ventuskyContainer {
+            #mobileRadarMount .mobile-radar-iframe-container iframe {
                 width: 100vw;
                 height: calc(100vh - 120px);
                 min-height: calc(100vh - 120px);
                 border-radius: 0;
-                padding-bottom: 0;
-            }
-
-            #mobileRadarMount #ventuskyContainer iframe {
-                width: 100%;
-                height: 100%;
             }
 
             #mobileRadarMount .ventusky-iframe-container::after {
