@@ -5,6 +5,9 @@ let currentWeatherData = null; // Store full weather data for modals
 let favorites = []; // Array of favorite locations
 let hourlyChart = null;
 let dailyChart = null;
+let mobileActiveTab = 'now';
+let radarDesktopParent = null;
+let radarDesktopNextSibling = null;
 // Layer switching removed - Ventusky handles layers internally
 
 const US_BOUNDS = {
@@ -308,8 +311,135 @@ window.addEventListener('message', (event) => {
     }
 }, { capture: true });
 
+function isMobileViewport() {
+    return window.innerWidth <= 768;
+}
+
+function setMobileTab(tabName) {
+    mobileActiveTab = tabName;
+
+    document.querySelectorAll('.mobile-tab-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.mobileTab === tabName);
+    });
+
+    document.querySelectorAll('.mobile-tab-panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.mobilePanel === tabName);
+    });
+
+    if (tabName === 'radar') {
+        syncRadarContainerForViewport();
+    }
+}
+
+function toggleMobileSearch(forceOpen = null) {
+    const panel = document.getElementById('mobileSearchPanel');
+    if (!panel) return;
+
+    const shouldOpen = forceOpen !== null ? forceOpen : !panel.classList.contains('active');
+    panel.classList.toggle('active', shouldOpen);
+
+    if (shouldOpen) {
+        const input = document.getElementById('mobileLocationInput');
+        if (input) input.focus();
+    }
+}
+
+function submitMobileSearch() {
+    const mobileInput = document.getElementById('mobileLocationInput');
+    const desktopInput = document.getElementById('locationInput');
+    if (!mobileInput || !desktopInput) return;
+
+    const value = mobileInput.value.trim();
+    if (!value) return;
+
+    desktopInput.value = value;
+    handleSearch();
+    toggleMobileSearch(false);
+}
+
+function getHourlyStartIndex(data) {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    let startIndex = 0;
+    for (let i = 0; i < data.hourly.time.length; i++) {
+        const hourTime = new Date(data.hourly.time[i]);
+        hourTime.setHours(0, 0, 0, 0);
+        if (hourTime.getTime() >= todayStart.getTime()) {
+            for (let j = i; j < data.hourly.time.length; j++) {
+                const currentHourTime = new Date(data.hourly.time[j]);
+                if (currentHourTime.getHours() >= currentHour) {
+                    startIndex = j;
+                    break;
+                }
+            }
+            if (startIndex > 0) break;
+        }
+    }
+
+    return startIndex;
+}
+
+function syncRadarContainerForViewport() {
+    const radarContainer = document.getElementById('radarContainer');
+    const radarSection = document.getElementById('radarSection');
+    const mobileMount = document.getElementById('mobileRadarMount');
+
+    if (!radarContainer || !radarSection || !mobileMount) return;
+
+    if (!radarDesktopParent) {
+        radarDesktopParent = radarContainer.parentElement;
+        radarDesktopNextSibling = radarContainer.nextElementSibling;
+    }
+
+    if (isMobileViewport()) {
+        if (radarContainer.parentElement !== mobileMount) {
+            mobileMount.appendChild(radarContainer);
+        }
+    } else if (radarDesktopParent && radarContainer.parentElement !== radarDesktopParent) {
+        if (radarDesktopNextSibling && radarDesktopNextSibling.parentElement === radarDesktopParent) {
+            radarDesktopParent.insertBefore(radarContainer, radarDesktopNextSibling);
+        } else {
+            radarDesktopParent.appendChild(radarContainer);
+        }
+    }
+}
+
+function initializeMobileUI() {
+    const tabButtons = document.querySelectorAll('.mobile-tab-btn');
+    tabButtons.forEach((button) => {
+        button.addEventListener('click', () => setMobileTab(button.dataset.mobileTab));
+    });
+
+    const mobileSearchToggle = document.getElementById('mobileSearchToggle');
+    if (mobileSearchToggle) {
+        mobileSearchToggle.addEventListener('click', () => toggleMobileSearch());
+    }
+
+    const mobileSearchSubmit = document.getElementById('mobileSearchSubmit');
+    if (mobileSearchSubmit) {
+        mobileSearchSubmit.addEventListener('click', submitMobileSearch);
+    }
+
+    const mobileLocationInput = document.getElementById('mobileLocationInput');
+    if (mobileLocationInput) {
+        mobileLocationInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                submitMobileSearch();
+            }
+        });
+    }
+
+    setMobileTab(mobileActiveTab);
+    syncRadarContainerForViewport();
+    window.addEventListener('resize', syncRadarContainerForViewport);
+}
+
 // Initialize with user's location or default
 window.addEventListener('DOMContentLoaded', () => {
+    initializeMobileUI();
     loadFavorites();
     
     // Favorites button click handler
@@ -792,30 +922,7 @@ function displayWeather(data) {
     // Hourly forecast
     const hourlyContainer = document.getElementById('hourlyForecast').querySelector('.flex');
     hourlyContainer.innerHTML = '';
-    const now = new Date();
-    const currentHour = now.getHours();
-
-    // Find today's data in the hourly forecast (skip past days due to past_days=2)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0); // Set to start of today
-
-    let startIndex = 0;
-    // Find the first hour of today
-    for (let i = 0; i < data.hourly.time.length; i++) {
-        const hourTime = new Date(data.hourly.time[i]);
-        hourTime.setHours(0, 0, 0, 0); // Set to start of that day
-        if (hourTime.getTime() >= todayStart.getTime()) {
-            // Found today's data, now find the closest hour to current time
-            for (let j = i; j < data.hourly.time.length; j++) {
-                const currentHourTime = new Date(data.hourly.time[j]);
-                if (currentHourTime.getHours() >= currentHour) {
-                    startIndex = j;
-                    break;
-                }
-            }
-            if (startIndex > 0) break; // Found it
-        }
-    }
+    const startIndex = getHourlyStartIndex(data);
     
     for (let i = 0; i < 24 && (startIndex + i) < data.hourly.time.length; i++) {
         const hourIndex = startIndex + i;
@@ -881,6 +988,7 @@ function displayWeather(data) {
 
     // Display weekly snow totals if there's snow in the forecast
     displayWeeklySnowTotals(data);
+    renderMobileUI(data);
 
     showContent();
     
@@ -888,6 +996,141 @@ function displayWeather(data) {
     if (currentWeatherData) {
         document.getElementById('hourlyHeader').addEventListener('click', () => openHourlyModal(currentWeatherData));
         document.getElementById('dailyHeader').addEventListener('click', () => openDailyModal(currentWeatherData));
+    }
+}
+
+function renderMobileUI(data) {
+    const mobileApp = document.getElementById('mobileApp');
+    if (!mobileApp) return;
+
+    const location = currentLocationName || `${data.latitude.toFixed(2)}, ${data.longitude.toFixed(2)}`;
+    const dateText = new Date().toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    });
+
+    const topLocation = document.getElementById('mobileTopLocation');
+    if (topLocation) topLocation.textContent = location;
+
+    const mobileNowLocation = document.getElementById('mobileNowLocation');
+    if (mobileNowLocation) mobileNowLocation.textContent = location;
+
+    const mobileNowDate = document.getElementById('mobileNowDate');
+    if (mobileNowDate) mobileNowDate.textContent = dateText;
+
+    const mobileNowTemp = document.getElementById('mobileNowTemp');
+    if (mobileNowTemp) mobileNowTemp.textContent = `${Math.round(data.current.temperature_2m)}${data.current_units.temperature_2m}`;
+
+    const mobileNowCondition = document.getElementById('mobileNowCondition');
+    if (mobileNowCondition) mobileNowCondition.textContent = getWeatherDescription(data.current.weather_code);
+
+    const mobileNowFeelsLike = document.getElementById('mobileNowFeelsLike');
+    if (mobileNowFeelsLike) {
+        mobileNowFeelsLike.textContent = `Feels like ${Math.round(data.current.apparent_temperature)}${data.current_units.apparent_temperature}`;
+    }
+
+    const pressureInHg = data.current.surface_pressure ? `${(data.current.surface_pressure * 0.02953).toFixed(2)}"` : '--';
+    const metrics = [
+        { label: 'Humidity', value: `${data.current.relative_humidity_2m}${data.current_units.relative_humidity_2m}` },
+        { label: 'Wind', value: `${data.current.wind_speed_10m} ${formatUnit(data.current_units.wind_speed_10m)}` },
+        { label: 'UV', value: `${data.current.uv_index}` },
+        { label: 'Pressure', value: pressureInHg }
+    ];
+
+    const metricsContainer = document.getElementById('mobileNowMetrics');
+    if (metricsContainer) {
+        metricsContainer.innerHTML = metrics.map((metric) => `
+            <div class="mobile-metric-pill">
+                <div class="mobile-metric-label">${metric.label}</div>
+                <div class="mobile-metric-value">${metric.value}</div>
+            </div>
+        `).join('');
+    }
+
+    if (data.daily && data.daily.sunrise && data.daily.sunrise[0]) {
+        document.getElementById('mobileSunrise').textContent = formatTime12Hour(new Date(data.daily.sunrise[0]));
+    }
+    if (data.daily && data.daily.sunset && data.daily.sunset[0]) {
+        document.getElementById('mobileSunset').textContent = formatTime12Hour(new Date(data.daily.sunset[0]));
+    }
+
+    const startIndex = getHourlyStartIndex(data);
+
+    const hourlyPreview = document.getElementById('mobileHourlyPreview');
+    if (hourlyPreview) {
+        hourlyPreview.innerHTML = '';
+        for (let i = 0; i < 5 && (startIndex + i) < data.hourly.time.length; i++) {
+            const idx = startIndex + i;
+            const hourTime = new Date(data.hourly.time[idx]);
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'mobile-hour-chip';
+            chip.innerHTML = `
+                <div class="mobile-hour-chip-time">${formatTime12Hour(hourTime)}</div>
+                <div class="mobile-hour-chip-icon">${getWeatherIcon(data.hourly.weather_code[idx], data.hourly.is_day ? data.hourly.is_day[idx] !== 0 : true)}</div>
+                <div class="mobile-hour-chip-temp">${Math.round(data.hourly.temperature_2m[idx])}${data.hourly_units.temperature_2m}</div>
+            `;
+            chip.addEventListener('click', () => openHourlyModal(data));
+            hourlyPreview.appendChild(chip);
+        }
+    }
+
+    const hourlyList = document.getElementById('mobileHourlyList');
+    if (hourlyList) {
+        hourlyList.innerHTML = '';
+        for (let idx = startIndex; idx < data.hourly.time.length; idx++) {
+            const hourTime = new Date(data.hourly.time[idx]);
+            const precipChance = data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined
+                ? `${data.hourly.precipitation_probability[idx]}%`
+                : '--';
+
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'mobile-hour-row';
+            row.innerHTML = `
+                <span>${hourTime.toLocaleDateString('en-US', { weekday: 'short' })} ${formatTime12Hour(hourTime).replace(':00', '')}</span>
+                <span>${getWeatherIcon(data.hourly.weather_code[idx], data.hourly.is_day ? data.hourly.is_day[idx] !== 0 : true)}</span>
+                <span>${Math.round(data.hourly.temperature_2m[idx])}${data.hourly_units.temperature_2m}</span>
+                <span>${precipChance}</span>
+                <span>${data.hourly.wind_speed_10m[idx]} ${formatUnit(data.hourly_units.wind_speed_10m)}</span>
+            `;
+            row.addEventListener('click', () => openHourlyModal(data));
+            hourlyList.appendChild(row);
+        }
+    }
+
+    const dailyList = document.getElementById('mobileDailyList');
+    if (dailyList) {
+        dailyList.innerHTML = '';
+        for (let i = 0; i < Math.min(7, data.daily.time.length - 2); i++) {
+            const dayIndex = i + 2;
+            const day = parseDateString(data.daily.time[dayIndex]);
+            const precipProb = data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined
+                ? data.daily.precipitation_probability_max[dayIndex]
+                : 0;
+
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'mobile-day-row';
+            row.innerHTML = `
+                <span>${day.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                <span>${getWeatherIcon(data.daily.weather_code[dayIndex])}</span>
+                <span class="mobile-day-hi-lo">${Math.round(data.daily.temperature_2m_max[dayIndex])}${data.daily_units.temperature_2m_max}/${Math.round(data.daily.temperature_2m_min[dayIndex])}${data.daily_units.temperature_2m_min}</span>
+                <span class="mobile-precip-track">
+                    <span class="mobile-precip-fill" style="width: ${Math.max(0, Math.min(100, precipProb))}%;"></span>
+                    <span class="mobile-precip-label">${precipProb}%</span>
+                </span>
+            `;
+            row.addEventListener('click', () => openDailyModal(data));
+            dailyList.appendChild(row);
+        }
+    }
+
+    const desktopInput = document.getElementById('locationInput');
+    const mobileInput = document.getElementById('mobileLocationInput');
+    if (desktopInput && mobileInput && desktopInput.value && !mobileInput.value) {
+        mobileInput.value = desktopInput.value;
     }
 }
 
@@ -1493,10 +1736,19 @@ function hideLoading() {
 
 function showContent() {
     document.getElementById('weatherContent').classList.remove('hidden');
+    const mobileApp = document.getElementById('mobileApp');
+    if (mobileApp) {
+        mobileApp.classList.remove('hidden');
+    }
+    syncRadarContainerForViewport();
 }
 
 function hideContent() {
     document.getElementById('weatherContent').classList.add('hidden');
+    const mobileApp = document.getElementById('mobileApp');
+    if (mobileApp) {
+        mobileApp.classList.add('hidden');
+    }
 }
 
 function showError(message) {
@@ -2214,30 +2466,7 @@ function openHourlyModal(data) {
     }
     
     // Prepare data
-    const now = new Date();
-    const currentHour = now.getHours();
-
-    // Find today's data in the hourly forecast (skip past days due to past_days=2)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0); // Set to start of today
-
-    let startIndex = 0;
-    // Find the first hour of today
-    for (let i = 0; i < data.hourly.time.length; i++) {
-        const hourTime = new Date(data.hourly.time[i]);
-        hourTime.setHours(0, 0, 0, 0); // Set to start of that day
-        if (hourTime.getTime() >= todayStart.getTime()) {
-            // Found today's data, now find the closest hour to current time
-            for (let j = i; j < data.hourly.time.length; j++) {
-                const currentHourTime = new Date(data.hourly.time[j]);
-                if (currentHourTime.getHours() >= currentHour) {
-                    startIndex = j;
-                    break;
-                }
-            }
-            if (startIndex > 0) break; // Found it
-        }
-    }
+    const startIndex = getHourlyStartIndex(data);
     
     const hours = [];
     const temps = [];
