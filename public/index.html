@@ -260,11 +260,217 @@
         .formula-container mjx-container {
             max-width: 100% !important;
         }
+
+        :root {
+            --mobile-gutter: 1rem;
+            --mobile-card-gap: 0.75rem;
+            --mobile-bottom-nav-height: 74px;
+        }
         
         @media (max-width: 640px) {
             .formula-container {
                 padding: 0.75rem 0.5rem;
                 font-size: 0.85em;
+            }
+        }
+
+        @media (max-width: 768px) {
+            html {
+                scroll-behavior: smooth;
+            }
+
+            body {
+                font-size: 16px;
+                line-height: 1.5;
+                padding: 0.875rem !important;
+                padding-bottom: calc(var(--mobile-bottom-nav-height) + 1rem) !important;
+            }
+
+            header {
+                margin-bottom: 1.25rem !important;
+            }
+
+            h1 {
+                line-height: 1.2;
+            }
+
+            .card {
+                border-radius: 1rem;
+                padding: 1rem !important;
+            }
+
+            input,
+            button,
+            select,
+            .btn,
+            .clickable {
+                min-height: 44px;
+            }
+
+            #locationInput {
+                min-height: 48px;
+                font-size: 1rem;
+            }
+
+            #weatherContent section {
+                margin-bottom: 1rem !important;
+            }
+
+            #currentWeatherSection h2 {
+                font-size: 1.75rem !important;
+            }
+
+            #currentTemp {
+                font-size: 3.25rem !important;
+                line-height: 1;
+            }
+
+            #currentCondition {
+                font-size: 1.1rem !important;
+            }
+
+            #metricsGrid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 0.75rem !important;
+            }
+
+            #metricsGrid .stat-card {
+                padding: 0.875rem !important;
+            }
+
+            #metricsGrid .text-xs {
+                font-size: 0.78rem !important;
+            }
+
+            #metricsGrid .text-xl,
+            #metricsGrid .text-2xl {
+                font-size: 1.35rem !important;
+                line-height: 1.25;
+            }
+
+            #hourlyForecast,
+            #dailyForecast {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x mandatory;
+                scroll-padding-inline: var(--mobile-gutter);
+                scrollbar-width: none;
+                padding-bottom: 0.35rem;
+            }
+
+            #hourlyForecast::-webkit-scrollbar,
+            #dailyForecast::-webkit-scrollbar {
+                display: none;
+            }
+
+            #hourlyForecast > div {
+                display: flex;
+                gap: var(--mobile-card-gap) !important;
+                min-width: max-content;
+                padding-right: 0.5rem;
+            }
+
+            #hourlyForecast > div > * {
+                min-width: min(78vw, 280px);
+                scroll-snap-align: start;
+                scroll-snap-stop: always;
+            }
+
+            #dailyForecast {
+                display: flex;
+                gap: var(--mobile-card-gap);
+                white-space: normal;
+            }
+
+            #dailyForecast > * {
+                flex: 0 0 min(88vw, 360px);
+                scroll-snap-align: start;
+                scroll-snap-stop: always;
+                min-height: 44px;
+            }
+
+            #radarSection {
+                padding: 0.85rem !important;
+            }
+
+            #radarContainer {
+                width: calc(100% + (var(--mobile-gutter) * 2));
+                margin-left: calc(var(--mobile-gutter) * -1);
+                margin-right: calc(var(--mobile-gutter) * -1);
+            }
+
+            #ventuskyContainer {
+                border-radius: 0;
+                min-height: 250px;
+                height: min(70vw, 390px);
+                padding-bottom: 0 !important;
+            }
+
+            #ventuskyContainer iframe {
+                width: 100%;
+                height: 100%;
+            }
+
+            .modal-content {
+                width: 96%;
+                max-height: 88vh;
+                border-radius: 0.875rem;
+            }
+
+            .chart-container {
+                padding: 0.75rem !important;
+            }
+
+            .chart-container canvas {
+                width: 100% !important;
+                height: 280px !important;
+                max-height: 52vh;
+            }
+
+            #mobileBottomNav {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 200;
+                height: var(--mobile-bottom-nav-height);
+                padding: 0.5rem 0.75rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+                background: rgba(15, 23, 42, 0.95);
+                backdrop-filter: blur(14px);
+                border-top: 1px solid rgba(148, 163, 184, 0.25);
+            }
+
+            #mobileBottomNav .mobile-nav-grid {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 0.35rem;
+                max-width: 560px;
+                margin: 0 auto;
+            }
+
+            #mobileBottomNav a {
+                min-height: 48px;
+                border-radius: 0.75rem;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 0.2rem;
+                color: #d1d5db;
+                font-size: 0.72rem;
+                font-weight: 600;
+                text-decoration: none;
+                background: rgba(30, 41, 59, 0.65);
+                border: 1px solid rgba(100, 116, 139, 0.3);
+            }
+
+            #mobileBottomNav a i {
+                font-size: 0.95rem;
+            }
+
+            #mobileBottomNav a:active {
+                transform: translateY(1px);
+                background: rgba(51, 65, 85, 0.9);
             }
         }
     </style>
@@ -352,7 +558,7 @@
         <!-- Main Content -->
         <div id="weatherContent" class="hidden">
             <!-- Current Weather -->
-            <section class="card rounded-2xl p-6 md:p-8 mb-6">
+            <section id="currentWeatherSection" class="card rounded-2xl p-6 md:p-8 mb-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                     <div>
                         <h2 id="currentLocation" class="text-2xl md:text-3xl font-bold text-white mb-2"></h2>
@@ -368,7 +574,7 @@
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
+                <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
                     <div class="stat-card rounded-xl p-4">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-thermometer-half text-orange-400 mr-1"></i>Feels Like</div>
                         <div id="feelsLike" class="text-xl font-bold text-white"></div>
@@ -495,7 +701,7 @@
             </section>
 
             <!-- Hourly Forecast -->
-            <section class="card rounded-2xl p-6 md:p-8 mb-6">
+            <section id="hourlySection" class="card rounded-2xl p-6 md:p-8 mb-6">
                 <h3 class="text-xl font-bold text-white mb-4 cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-2" id="hourlyHeader">
                     <span class="text-2xl">⏰</span> 24-Hour Forecast <i class="fas fa-external-link-alt ml-2 text-sm text-gray-400"></i>
                 </h3>
@@ -507,7 +713,7 @@
             </section>
 
             <!-- Daily Forecast -->
-            <section class="card rounded-2xl p-6 md:p-8 mb-6">
+            <section id="dailySection" class="card rounded-2xl p-6 md:p-8 mb-6">
                 <h3 class="text-xl font-bold text-white mb-4 cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-2" id="dailyHeader">
                     <span class="text-2xl">📅</span> 14-Day Forecast <i class="fas fa-external-link-alt ml-2 text-sm text-gray-400"></i>
                 </h3>
@@ -517,7 +723,7 @@
             </section>
 
             <!-- Weather Radar -->
-            <section class="card rounded-2xl p-6 md:p-8">
+            <section id="radarSection" class="card rounded-2xl p-6 md:p-8">
                 <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
                     <span class="text-2xl">📡</span> Weather Radar
                 </h3>
@@ -541,6 +747,27 @@
             </section>
         </div>
     </div>
+
+    <nav id="mobileBottomNav" class="md:hidden" aria-label="Mobile weather navigation">
+        <div class="mobile-nav-grid">
+            <a href="#currentWeatherSection">
+                <i class="fas fa-house"></i>
+                <span>Now</span>
+            </a>
+            <a href="#hourlySection">
+                <i class="fas fa-clock"></i>
+                <span>Hourly</span>
+            </a>
+            <a href="#dailySection">
+                <i class="fas fa-calendar-days"></i>
+                <span>Daily</span>
+            </a>
+            <a href="#radarSection">
+                <i class="fas fa-satellite-dish"></i>
+                <span>Radar</span>
+            </a>
+        </div>
+    </nav>
 
     <!-- Hourly Forecast Modal -->
     <div id="hourlyModal" class="modal">
