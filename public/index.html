@@ -355,6 +355,60 @@
                 gap: 0.5rem;
             }
 
+            .mobile-search-actions {
+                display: flex;
+                gap: 0.45rem;
+                margin-top: 0.55rem;
+            }
+
+            .mobile-search-action-btn {
+                flex: 1;
+                height: 36px;
+                border-radius: 0.7rem;
+                border: 1px solid rgba(148, 163, 184, 0.35);
+                background: rgba(30, 41, 59, 0.68);
+                color: #f8fafc;
+                font-size: 0.76rem;
+                font-weight: 600;
+            }
+
+            #mobileFavoritesPanel {
+                margin-top: 0.5rem;
+                border-radius: 0.8rem;
+                border: 1px solid rgba(148, 163, 184, 0.24);
+                background: rgba(15, 23, 42, 0.8);
+                padding: 0.5rem;
+            }
+
+            #mobileFavoritesPanel.hidden {
+                display: none;
+            }
+
+            #mobileFavoritesList {
+                max-height: 160px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 0.35rem;
+            }
+
+            .mobile-favorite-item {
+                border: 1px solid rgba(148, 163, 184, 0.22);
+                border-radius: 0.7rem;
+                background: rgba(30, 41, 59, 0.65);
+                color: #f8fafc;
+                text-align: left;
+                padding: 0.52rem 0.6rem;
+                font-size: 0.75rem;
+            }
+
+            #mobileNoFavorites {
+                color: #94a3b8;
+                font-size: 0.72rem;
+                text-align: center;
+                padding: 0.55rem 0.4rem;
+            }
+
             #mobileLocationInput {
                 flex: 1;
                 height: 40px;
@@ -443,10 +497,49 @@
                 margin-top: 0.45rem;
             }
 
+            #mobileNowBanners {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .mobile-now-banner {
+                border-radius: 0.78rem;
+                border: 1px solid rgba(148, 163, 184, 0.32);
+                background: rgba(30, 41, 59, 0.75);
+                color: #f8fafc;
+                font-size: 0.78rem;
+                line-height: 1.35;
+                padding: 0.56rem 0.7rem;
+            }
+
+            .mobile-alert-banner {
+                border-color: rgba(251, 113, 133, 0.4);
+                background: rgba(127, 29, 29, 0.45);
+            }
+
+            .mobile-precip-banner {
+                border-color: rgba(56, 189, 248, 0.4);
+                background: rgba(30, 58, 138, 0.34);
+            }
+
+            #mobileNowHighLow {
+                color: #cbd5e1;
+                font-size: 0.86rem;
+                margin-top: 0.2rem;
+            }
+
             #mobileNowFeelsLike {
                 color: #94a3b8;
                 font-size: 0.85rem;
                 margin-top: 0.2rem;
+            }
+
+            #mobileNowUpdated {
+                color: #64748b;
+                font-size: 0.7rem;
+                margin-top: 0.18rem;
             }
 
             #mobileNowMetrics {
@@ -565,17 +658,43 @@
 
             .mobile-hour-row {
                 display: grid;
-                grid-template-columns: 52px 28px 52px 62px 1fr;
+                grid-template-columns: 82px 24px 48px 44px 1fr;
                 align-items: center;
-                gap: 0.3rem;
+                gap: 0.35rem;
                 padding: 0.65rem 0.7rem;
                 font-size: 0.78rem;
                 white-space: nowrap;
             }
 
+            .mobile-hour-time {
+                color: #cbd5e1;
+                font-size: 0.72rem;
+                letter-spacing: 0.01em;
+            }
+
+            .mobile-hour-icon,
+            .mobile-hour-temp,
+            .mobile-hour-precip,
+            .mobile-hour-wind {
+                text-align: center;
+            }
+
+            .mobile-hour-temp {
+                font-weight: 600;
+            }
+
+            .mobile-hour-precip {
+                color: #7dd3fc;
+            }
+
+            .mobile-hour-wind {
+                color: #94a3b8;
+                font-size: 0.72rem;
+            }
+
             .mobile-day-row {
                 display: grid;
-                grid-template-columns: 72px 28px 74px 1fr;
+                grid-template-columns: 90px 24px 74px 1fr;
                 align-items: center;
                 gap: 0.4rem;
                 padding: 0.75rem 0.7rem;
@@ -677,7 +796,57 @@
 
             .mobile-tab-btn.active {
                 color: #f8fafc;
-                background: rgba(30, 41, 59, 0.65);
+                background: linear-gradient(180deg, rgba(14, 116, 144, 0.55) 0%, rgba(30, 41, 59, 0.8) 100%);
+                box-shadow: inset 0 2px 0 rgba(125, 211, 252, 0.95);
+            }
+
+            .mobile-tab-btn.active i {
+                color: #7dd3fc;
+            }
+
+            .mobile-secondary-strip {
+                margin-top: 0.85rem;
+                border-radius: 0.85rem;
+                border: 1px solid rgba(148, 163, 184, 0.24);
+                background: rgba(15, 23, 42, 0.8);
+                padding: 0.6rem 0.7rem;
+            }
+
+            .mobile-secondary-title {
+                color: #cbd5e1;
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                letter-spacing: 0.07em;
+                margin-bottom: 0.4rem;
+            }
+
+            .mobile-pollen-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.45rem;
+                font-size: 0.72rem;
+            }
+
+            .mobile-pollen-pill {
+                border: 1px solid rgba(148, 163, 184, 0.24);
+                border-radius: 0.7rem;
+                background: rgba(30, 41, 59, 0.68);
+                padding: 0.45rem;
+                text-align: center;
+            }
+
+            .mobile-pollen-value {
+                color: #f8fafc;
+                font-size: 0.84rem;
+                font-weight: 600;
+            }
+
+            #mobileSnowContent {
+                display: flex;
+                flex-direction: column;
+                gap: 0.35rem;
+                color: #cbd5e1;
+                font-size: 0.74rem;
             }
 
             .modal-content {
@@ -708,6 +877,14 @@
                     <i class="fas fa-arrow-right"></i>
                 </button>
             </div>
+            <div class="mobile-search-actions">
+                <button id="mobileFavoritesToggle" class="mobile-search-action-btn" type="button"><i class="fas fa-star mr-1"></i>Favorites</button>
+                <button id="mobileAddFavoriteBtn" class="mobile-search-action-btn" type="button"><i class="fas fa-plus mr-1"></i>Save Current</button>
+            </div>
+            <div id="mobileFavoritesPanel" class="hidden">
+                <div id="mobileFavoritesList"></div>
+                <div id="mobileNoFavorites" class="hidden">No favorites yet.</div>
+            </div>
         </div>
     </div>
 
@@ -719,9 +896,15 @@
                         <div id="mobileNowLocation">--</div>
                         <div id="mobileNowDate">--</div>
                     </div>
+                    <div id="mobileNowBanners" class="hidden">
+                        <div id="mobileAlertBanner" class="mobile-now-banner mobile-alert-banner hidden"></div>
+                        <div id="mobilePrecipBanner" class="mobile-now-banner mobile-precip-banner hidden"></div>
+                    </div>
                     <div id="mobileNowTemp">--</div>
+                    <div id="mobileNowHighLow">H:-- L:--</div>
                     <div id="mobileNowCondition">--</div>
                     <div id="mobileNowFeelsLike">Feels like --</div>
+                    <div id="mobileNowUpdated">Updated --</div>
                     <div id="mobileNowMetrics"></div>
                     <div class="mobile-sunband">
                         <div class="mobile-sunband-times">
@@ -735,6 +918,11 @@
                         </div>
                     </div>
                     <div id="mobileHourlyPreview"></div>
+                    <div id="mobilePollenStrip" class="mobile-secondary-strip hidden"></div>
+                    <div id="mobileSnowSection" class="mobile-secondary-strip hidden">
+                        <div class="mobile-secondary-title">Weekly Snow Totals</div>
+                        <div id="mobileSnowContent"></div>
+                    </div>
                 </div>
             </section>
             <section id="mobileTabHourly" class="mobile-tab-panel" data-mobile-panel="hourly">

@@ -8,6 +8,8 @@ let dailyChart = null;
 let mobileActiveTab = 'now';
 let radarDesktopParent = null;
 let radarDesktopNextSibling = null;
+let currentAlerts = [];
+let currentAirQualityData = null;
 // Layer switching removed - Ventusky handles layers internally
 
 const US_BOUNDS = {
@@ -235,6 +237,11 @@ function switchToFavorite(lat, lon, name) {
     currentLocationName = name;
     fetchWeather(lat, lon);
     document.getElementById('favoritesDropdown').classList.add('hidden');
+    const mobileFavoritesPanel = document.getElementById('mobileFavoritesPanel');
+    if (mobileFavoritesPanel) {
+        mobileFavoritesPanel.classList.add('hidden');
+    }
+    toggleMobileSearch(false);
 }
 
 function renderFavorites() {
@@ -275,6 +282,34 @@ function renderFavorites() {
             favoritesList.appendChild(favItem);
         });
     }
+
+    renderMobileFavorites();
+}
+
+function renderMobileFavorites() {
+    const mobileFavoritesList = document.getElementById('mobileFavoritesList');
+    const mobileNoFavorites = document.getElementById('mobileNoFavorites');
+    if (!mobileFavoritesList || !mobileNoFavorites) return;
+
+    mobileFavoritesList.innerHTML = '';
+
+    if (favorites.length === 0) {
+        mobileNoFavorites.classList.remove('hidden');
+        return;
+    }
+
+    mobileNoFavorites.classList.add('hidden');
+    favorites.forEach((fav) => {
+        const favItem = document.createElement('button');
+        favItem.type = 'button';
+        favItem.className = 'mobile-favorite-item';
+        favItem.innerHTML = `
+            <div class="font-semibold">${fav.name}</div>
+            <div class="text-white/60 text-xs mt-0.5">${fav.lat.toFixed(2)}, ${fav.lon.toFixed(2)}</div>
+        `;
+        favItem.addEventListener('click', () => switchToFavorite(fav.lat, fav.lon, fav.name));
+        mobileFavoritesList.appendChild(favItem);
+    });
 }
 
 // Prevent iframe from opening new tabs
@@ -421,6 +456,19 @@ function initializeMobileUI() {
     const mobileSearchSubmit = document.getElementById('mobileSearchSubmit');
     if (mobileSearchSubmit) {
         mobileSearchSubmit.addEventListener('click', submitMobileSearch);
+    }
+
+    const mobileFavoritesToggle = document.getElementById('mobileFavoritesToggle');
+    if (mobileFavoritesToggle) {
+        mobileFavoritesToggle.addEventListener('click', () => {
+            const panel = document.getElementById('mobileFavoritesPanel');
+            if (panel) panel.classList.toggle('hidden');
+        });
+    }
+
+    const mobileAddFavoriteBtn = document.getElementById('mobileAddFavoriteBtn');
+    if (mobileAddFavoriteBtn) {
+        mobileAddFavoriteBtn.addEventListener('click', addFavorite);
     }
 
     const mobileLocationInput = document.getElementById('mobileLocationInput');
@@ -1022,6 +1070,15 @@ function renderMobileUI(data) {
     const mobileNowTemp = document.getElementById('mobileNowTemp');
     if (mobileNowTemp) mobileNowTemp.textContent = `${Math.round(data.current.temperature_2m)}${data.current_units.temperature_2m}`;
 
+    const mobileNowHighLow = document.getElementById('mobileNowHighLow');
+    if (mobileNowHighLow) {
+        const todayHigh = data.daily?.temperature_2m_max?.[2];
+        const todayLow = data.daily?.temperature_2m_min?.[2];
+        mobileNowHighLow.textContent = todayHigh !== undefined && todayLow !== undefined
+            ? `H:${Math.round(todayHigh)}°  L:${Math.round(todayLow)}°`
+            : 'H:--  L:--';
+    }
+
     const mobileNowCondition = document.getElementById('mobileNowCondition');
     if (mobileNowCondition) mobileNowCondition.textContent = getWeatherDescription(data.current.weather_code);
 
@@ -1030,12 +1087,60 @@ function renderMobileUI(data) {
         mobileNowFeelsLike.textContent = `Feels like ${Math.round(data.current.apparent_temperature)}${data.current_units.apparent_temperature}`;
     }
 
+    const mobileNowUpdated = document.getElementById('mobileNowUpdated');
+    if (mobileNowUpdated) {
+        mobileNowUpdated.textContent = `Updated ${formatLastUpdated(new Date())} • Pull down to refresh`;
+    }
+
+    const mobileNowBanners = document.getElementById('mobileNowBanners');
+    const mobileAlertBanner = document.getElementById('mobileAlertBanner');
+    const mobilePrecipBanner = document.getElementById('mobilePrecipBanner');
+    let hasMobileBanners = false;
+
+    if (mobileAlertBanner) {
+        if (currentAlerts.length > 0) {
+            const firstAlert = currentAlerts[0]?.properties?.event || 'Weather Alert';
+            const extraCount = currentAlerts.length - 1;
+            mobileAlertBanner.textContent = extraCount > 0 ? `${firstAlert} (+${extraCount} more)` : firstAlert;
+            mobileAlertBanner.classList.remove('hidden');
+            hasMobileBanners = true;
+        } else {
+            mobileAlertBanner.classList.add('hidden');
+        }
+    }
+
+    if (mobilePrecipBanner) {
+        const precipSection = document.getElementById('precipTimingSection');
+        const precipTiming = document.getElementById('precipTiming');
+        const precipIcon = document.getElementById('precipIcon');
+        if (precipSection && !precipSection.classList.contains('hidden') && precipTiming) {
+            mobilePrecipBanner.textContent = `${precipIcon ? precipIcon.textContent : '🌧️'} ${precipTiming.textContent}`;
+            mobilePrecipBanner.classList.remove('hidden');
+            hasMobileBanners = true;
+        } else {
+            mobilePrecipBanner.classList.add('hidden');
+        }
+    }
+
+    if (mobileNowBanners) {
+        mobileNowBanners.classList.toggle('hidden', !hasMobileBanners);
+    }
+
     const pressureInHg = data.current.surface_pressure ? `${(data.current.surface_pressure * 0.02953).toFixed(2)}"` : '--';
+    const moonPhase = getMoonPhase(calculateMoonPhase(new Date()));
+    const aqiValue = currentAirQualityData?.current?.us_aqi;
+    const sinusRisk = document.getElementById('sinusRiskValue')?.textContent || '--';
+    const allergyRisk = document.getElementById('allergyRiskValue')?.textContent || '--';
+
     const metrics = [
         { label: 'Humidity', value: `${data.current.relative_humidity_2m}${data.current_units.relative_humidity_2m}` },
         { label: 'Wind', value: `${data.current.wind_speed_10m} ${formatUnit(data.current_units.wind_speed_10m)}` },
         { label: 'UV', value: `${data.current.uv_index}` },
-        { label: 'Pressure', value: pressureInHg }
+        { label: 'Pressure', value: pressureInHg },
+        { label: 'AQI', value: aqiValue !== undefined && aqiValue !== null ? `${aqiValue}` : '--' },
+        { label: 'Sinus', value: sinusRisk },
+        { label: 'Allergy', value: allergyRisk },
+        { label: 'Moon', value: moonPhase.name }
     ];
 
     const metricsContainer = document.getElementById('mobileNowMetrics');
@@ -1060,7 +1165,7 @@ function renderMobileUI(data) {
     const hourlyPreview = document.getElementById('mobileHourlyPreview');
     if (hourlyPreview) {
         hourlyPreview.innerHTML = '';
-        for (let i = 0; i < 5 && (startIndex + i) < data.hourly.time.length; i++) {
+        for (let i = 0; i < 12 && (startIndex + i) < data.hourly.time.length; i++) {
             const idx = startIndex + i;
             const hourTime = new Date(data.hourly.time[idx]);
             const chip = document.createElement('button');
@@ -1089,11 +1194,11 @@ function renderMobileUI(data) {
             row.type = 'button';
             row.className = 'mobile-hour-row';
             row.innerHTML = `
-                <span>${hourTime.toLocaleDateString('en-US', { weekday: 'short' })} ${formatTime12Hour(hourTime).replace(':00', '')}</span>
-                <span>${getWeatherIcon(data.hourly.weather_code[idx], data.hourly.is_day ? data.hourly.is_day[idx] !== 0 : true)}</span>
-                <span>${Math.round(data.hourly.temperature_2m[idx])}${data.hourly_units.temperature_2m}</span>
-                <span>${precipChance}</span>
-                <span>${data.hourly.wind_speed_10m[idx]} ${formatUnit(data.hourly_units.wind_speed_10m)}</span>
+                <span class="mobile-hour-time">${hourTime.toLocaleDateString('en-US', { weekday: 'short' })} ${formatTime12Hour(hourTime).replace(':00', '')}</span>
+                <span class="mobile-hour-icon">${getWeatherIcon(data.hourly.weather_code[idx], data.hourly.is_day ? data.hourly.is_day[idx] !== 0 : true)}</span>
+                <span class="mobile-hour-temp">${Math.round(data.hourly.temperature_2m[idx])}${data.hourly_units.temperature_2m}</span>
+                <span class="mobile-hour-precip">${precipChance}</span>
+                <span class="mobile-hour-wind">${data.hourly.wind_speed_10m[idx]} ${formatUnit(data.hourly_units.wind_speed_10m)}</span>
             `;
             row.addEventListener('click', () => openHourlyModal(data));
             hourlyList.appendChild(row);
@@ -1103,7 +1208,7 @@ function renderMobileUI(data) {
     const dailyList = document.getElementById('mobileDailyList');
     if (dailyList) {
         dailyList.innerHTML = '';
-        for (let i = 0; i < Math.min(7, data.daily.time.length - 2); i++) {
+        for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
             const dayIndex = i + 2;
             const day = parseDateString(data.daily.time[dayIndex]);
             const precipProb = data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined
@@ -1114,7 +1219,7 @@ function renderMobileUI(data) {
             row.type = 'button';
             row.className = 'mobile-day-row';
             row.innerHTML = `
-                <span>${day.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                <span>${day.toLocaleDateString('en-US', { weekday: 'short' }).replace(',', '')} ${day.getMonth() + 1}/${day.getDate()}</span>
                 <span>${getWeatherIcon(data.daily.weather_code[dayIndex])}</span>
                 <span class="mobile-day-hi-lo">${Math.round(data.daily.temperature_2m_max[dayIndex])}${data.daily_units.temperature_2m_max}/${Math.round(data.daily.temperature_2m_min[dayIndex])}${data.daily_units.temperature_2m_min}</span>
                 <span class="mobile-precip-track">
@@ -1127,11 +1232,59 @@ function renderMobileUI(data) {
         }
     }
 
+    const mobilePollenStrip = document.getElementById('mobilePollenStrip');
+    if (mobilePollenStrip && currentPollenData?.current) {
+        const current = currentPollenData.current;
+        const tree = Math.max(current.alder_pollen || 0, current.birch_pollen || 0, current.olive_pollen || 0);
+        const grass = current.grass_pollen || 0;
+        const weed = Math.max(current.mugwort_pollen || 0, current.ragweed_pollen || 0);
+        const hasPollen = tree > 0 || grass > 0 || weed > 0;
+
+        if (hasPollen) {
+            mobilePollenStrip.innerHTML = `
+                <div class="mobile-secondary-title">Pollen Snapshot</div>
+                <div class="mobile-pollen-grid">
+                    <div class="mobile-pollen-pill"><div>Tree</div><div class="mobile-pollen-value">${Math.round(tree)}</div></div>
+                    <div class="mobile-pollen-pill"><div>Grass</div><div class="mobile-pollen-value">${Math.round(grass)}</div></div>
+                    <div class="mobile-pollen-pill"><div>Weed</div><div class="mobile-pollen-value">${Math.round(weed)}</div></div>
+                </div>
+            `;
+            mobilePollenStrip.classList.remove('hidden');
+        } else {
+            mobilePollenStrip.classList.add('hidden');
+        }
+    } else if (mobilePollenStrip) {
+        mobilePollenStrip.classList.add('hidden');
+    }
+
+    const mobileSnowSection = document.getElementById('mobileSnowSection');
+    const mobileSnowContent = document.getElementById('mobileSnowContent');
+    if (mobileSnowSection && mobileSnowContent) {
+        const snowDays = [];
+        for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
+            const dayIndex = i + 2;
+            const snowfall = data.daily.snowfall_sum?.[dayIndex] || 0;
+            if (snowfall > 0) {
+                const day = parseDateString(data.daily.time[dayIndex]);
+                snowDays.push(`${day.toLocaleDateString('en-US', { weekday: 'short' })} ${day.getMonth() + 1}/${day.getDate()}: ${snowfall.toFixed(1)} ${data.daily_units.snowfall_sum || 'in'}`);
+            }
+        }
+
+        if (snowDays.length > 0) {
+            mobileSnowContent.innerHTML = snowDays.map((item) => `<div>${item}</div>`).join('');
+            mobileSnowSection.classList.remove('hidden');
+        } else {
+            mobileSnowSection.classList.add('hidden');
+        }
+    }
+
     const desktopInput = document.getElementById('locationInput');
     const mobileInput = document.getElementById('mobileLocationInput');
     if (desktopInput && mobileInput && desktopInput.value && !mobileInput.value) {
         mobileInput.value = desktopInput.value;
     }
+
+    renderMobileFavorites();
 }
 
 async function displayWeeklySnowTotals(data) {
@@ -1764,6 +1917,9 @@ function hideError() {
 async function fetchWeatherAlerts(lat, lon) {
     // Only fetch alerts for US locations (rough check: lat 24-50, lon -125 to -66)
     if (lat < 24 || lat > 50 || lon < -125 || lon > -66) {
+        currentAlerts = [];
+        const alertsContainer = document.getElementById('weatherAlerts');
+        alertsContainer.classList.add('hidden');
         return; // Not in US, skip alerts
     }
     
@@ -1823,16 +1979,29 @@ async function fetchWeatherAlerts(lat, lon) {
             
             if (activeAlerts.length > 0) {
                 displayAlerts(activeAlerts);
+            } else {
+                currentAlerts = [];
+                const alertsContainer = document.getElementById('weatherAlerts');
+                alertsContainer.classList.add('hidden');
+                if (currentWeatherData) renderMobileUI(currentWeatherData);
             }
+        } else {
+            currentAlerts = [];
+            const alertsContainer = document.getElementById('weatherAlerts');
+            alertsContainer.classList.add('hidden');
+            if (currentWeatherData) renderMobileUI(currentWeatherData);
         }
     } catch (error) {
         // Log error for debugging but don't break the app
         console.error('Weather alerts error:', error.message);
+        currentAlerts = [];
+        if (currentWeatherData) renderMobileUI(currentWeatherData);
     }
 }
 
 function displayAlerts(alerts) {
     const alertsContainer = document.getElementById('weatherAlerts');
+    currentAlerts = alerts;
     alertsContainer.innerHTML = '';
     alertsContainer.classList.remove('hidden');
     
@@ -1915,6 +2084,8 @@ function displayAlerts(alerts) {
         
         alertsContainer.appendChild(alertItem);
     });
+
+    if (currentWeatherData) renderMobileUI(currentWeatherData);
 }
 
 // Air Quality functionality
@@ -1930,6 +2101,9 @@ async function fetchAirQuality(lat, lon) {
             // Hide air quality and pollen sections if API is unavailable
             document.getElementById('airQualitySection').classList.add('hidden');
             document.getElementById('pollenSection').classList.add('hidden');
+            currentAirQualityData = null;
+            currentPollenData = null;
+            if (currentWeatherData) renderMobileUI(currentWeatherData);
             return;
         }
         
@@ -1938,10 +2112,14 @@ async function fetchAirQuality(lat, lon) {
         if (aqiData.error || !aqiData.current) {
             document.getElementById('airQualitySection').classList.add('hidden');
             document.getElementById('pollenSection').classList.add('hidden');
+            currentAirQualityData = null;
+            currentPollenData = null;
+            if (currentWeatherData) renderMobileUI(currentWeatherData);
             return;
         }
         
         // Store pollen data for allergy risk calculation
+        currentAirQualityData = aqiData;
         currentPollenData = aqiData;
         
         displayAirQuality(aqiData.current);
@@ -1949,10 +2127,14 @@ async function fetchAirQuality(lat, lon) {
         
         // Recalculate allergy risk with real pollen data
         updateAllergyRiskWithPollenData();
+        if (currentWeatherData) renderMobileUI(currentWeatherData);
     } catch (error) {
         console.error('Error fetching air quality:', error);
         document.getElementById('airQualitySection').classList.add('hidden');
         document.getElementById('pollenSection').classList.add('hidden');
+        currentAirQualityData = null;
+        currentPollenData = null;
+        if (currentWeatherData) renderMobileUI(currentWeatherData);
     }
 }
 
@@ -2146,6 +2328,7 @@ function updateAllergyRiskWithPollenData() {
     document.getElementById('allergyRiskValue').textContent = `${allergyRisk}/10`;
     document.getElementById('allergyRiskLabel').textContent = allergyLabel.label;
     document.getElementById('allergyRiskLabel').className = `text-xs font-semibold ${allergyLabel.colorClass}`;
+    if (currentWeatherData) renderMobileUI(currentWeatherData);
 }
 
 // ============================================
