@@ -519,29 +519,49 @@ export default {
     // Proxy Ventusky iframe with desktop user agent to remove mobile download button
     if (url.pathname.startsWith('/ventusky-proxy')) {
       try {
-        // Extract Ventusky path and parameters
-        // Remove /ventusky-proxy prefix to get the Ventusky path (e.g., /precipitation-map)
-        const ventuskyPath = url.pathname.replace('/ventusky-proxy', '') || '/precipitation-map';
+        // Remove /ventusky-proxy prefix to get the Ventusky path
+        const ventuskyPath = url.pathname.replace('/ventusky-proxy', '') || '/';
         const ventuskyParams = url.search;
-        const ventuskyUrl = \`https://www.ventusky.com\${ventuskyPath}\${ventuskyParams}\`;
-        
-        // Fetch with desktop user agent to get desktop version (no download button)
-        const response = await fetch(ventuskyUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-          },
-        });
-        
-        if (!response.ok) {
-          return new Response('Failed to load Ventusky', { status: response.status });
+        const requestHeaders = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        };
+        let upstreamUrl = new URL(\`https://www.ventusky.com\${ventuskyPath}\${ventuskyParams}\`);
+
+        // Follow upstream redirects manually so the client never receives a redirect to ventusky.com.
+        let response = null;
+        for (let i = 0; i < 5; i++) {
+          response = await fetch(upstreamUrl.toString(), {
+            headers: requestHeaders,
+            redirect: 'manual',
+          });
+
+          if (![301, 302, 303, 307, 308].includes(response.status)) {
+            break;
+          }
+
+          const location = response.headers.get('location');
+          if (!location) {
+            break;
+          }
+
+          const redirected = new URL(location, upstreamUrl);
+          if (!['www.ventusky.com', 'ventusky.com'].includes(redirected.hostname)) {
+            return new Response('Blocked Ventusky redirect', { status: 502 });
+          }
+
+          upstreamUrl = redirected;
         }
-        
+
+        if (!response || !response.ok) {
+          return new Response('Failed to load Ventusky', { status: response ? response.status : 502 });
+        }
+
         // Get the HTML content
         let html = await response.text();
-        
-        // Inject CSS and JavaScript to hide download button
+
+        // Inject CSS and JavaScript to hide download button and block attempts to escape iframe.
         const hideButtonScript = \`
           <style>
             /* Hide download app button */
@@ -600,6 +620,22 @@ export default {
               setInterval(hideDownloadButton, 1000);
             })();
           </script>
+          <script>
+            (function() {
+              // Keep links and JS-initiated openings inside the iframe.
+              const originalOpen = window.open;
+              window.open = function() { return null; };
+              document.addEventListener('click', function(event) {
+                const link = event.target && event.target.closest ? event.target.closest('a') : null;
+                if (!link) return;
+                if (link.target === '_top' || link.target === '_parent') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  link.target = '_self';
+                }
+              }, true);
+            })();
+          </script>
         \`;
         
         // Inject the script before closing head tag, or at the beginning of body
@@ -617,6 +653,7 @@ export default {
             'Content-Type': 'text/html;charset=UTF-8',
             'X-Frame-Options': 'ALLOWALL',
             'Content-Security-Policy': "frame-ancestors *;",
+            'Cache-Control': 'no-store',
           },
         });
       } catch (error) {
