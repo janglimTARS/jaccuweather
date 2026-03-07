@@ -87,8 +87,19 @@ export default {
       const apiPath = url.pathname.replace('/api/', '');
       let targetUrl;
       
-      // Geocoding API uses a different base URL
-      if (apiPath.startsWith('geocoding')) {
+      if (apiPath.startsWith('tides/')) {
+        // NOAA CO-OPS tides API proxy
+        const tidePath = apiPath.replace(/^tides\\//, '');
+        targetUrl = \`https://api.tidesandcurrents.noaa.gov/api/prod/\${tidePath}\${url.search}\`;
+      } else if (apiPath.startsWith('tide-stations')) {
+        // NOAA station metadata API proxy
+        const stationParams = new URLSearchParams(url.search);
+        if (!stationParams.has('type')) stationParams.set('type', 'tidepredictions');
+        if (!stationParams.has('units')) stationParams.set('units', 'english');
+        if (!stationParams.has('format')) stationParams.set('format', 'json');
+        targetUrl = \`https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?\${stationParams.toString()}\`;
+      } else if (apiPath.startsWith('geocoding')) {
+        // Geocoding API uses a different base URL
         // Convert /api/geocoding?name=... to geocoding-api.open-meteo.com/v1/search?name=...
         const searchParams = url.search;
         targetUrl = \`https://geocoding-api.open-meteo.com/v1/search\${searchParams}\`;
@@ -339,8 +350,8 @@ export default {
             // Create cache key from the full request URL
             const cacheKey = new Request(targetUrl);
             
-            // Try to get from cache first (only for forecast and geocoding)
-            if (apiPath.startsWith('forecast') || apiPath.startsWith('geocoding')) {
+            // Try to get from cache first (forecast, geocoding, and station metadata)
+            if (apiPath.startsWith('forecast') || apiPath.startsWith('geocoding') || apiPath.startsWith('tide-stations')) {
               const cachedResponse = await caches.default.match(cacheKey);
               if (cachedResponse) {
                 // Clone the cached response and add CORS headers
@@ -460,10 +471,10 @@ export default {
               throw new Error(\`Invalid response format: \${parseError.message}\`);
             }
             
-            // Cache successful responses (only for forecast and geocoding)
-            if (apiPath.startsWith('forecast') || apiPath.startsWith('geocoding')) {
+            // Cache successful responses (forecast, geocoding, and station metadata)
+            if (apiPath.startsWith('forecast') || apiPath.startsWith('geocoding') || apiPath.startsWith('tide-stations')) {
               // Determine cache duration based on API type
-              const cacheSeconds = apiPath.startsWith('forecast') ? 600 : 3600; // 10 min for forecast, 1 hour for geocoding
+              const cacheSeconds = apiPath.startsWith('forecast') ? 600 : 3600; // 10 min for forecast, 1 hour for geocoding/stations
               
               // Create a response with cache headers
               const cacheResponse = new Response(JSON.stringify(data), {
@@ -622,4 +633,3 @@ export default {
 // Write the built worker file
 fs.writeFileSync(path.join(__dirname, 'src', 'index.js'), workerContent);
 console.log('Build complete! Generated src/index.js');
-
