@@ -640,6 +640,13 @@
                 font-weight: 600;
             }
 
+            .mobile-hour-chip-tide {
+                margin-top: 0.18rem;
+                color: #67e8f9;
+                font-size: 0.62rem;
+                line-height: 1.1;
+            }
+
             #mobileHourlyList,
             #mobileDailyList {
                 display: flex;
@@ -716,6 +723,16 @@
                 display: grid;
                 grid-template-columns: 90px 24px 74px 1fr;
                 gap: 0.4rem;
+            }
+
+            .mobile-hour-tide-row,
+            .mobile-day-tide-row {
+                grid-column: 1 / -1;
+                color: #67e8f9;
+                font-size: 0.68rem;
+                text-align: left;
+                white-space: normal;
+                padding-bottom: 0.35rem;
             }
 
             .mobile-day-hi-lo {
@@ -1191,6 +1208,17 @@
                         <i class="fas fa-leaf text-lime-400 mr-1"></i><strong>Grass:</strong> General &nbsp;|&nbsp;
                         <i class="fas fa-seedling text-amber-400 mr-1"></i><strong>Weed:</strong> Mugwort, Ragweed
                     </p>
+                </div>
+            </section>
+
+            <!-- Tides -->
+            <section id="tidesSection" class="hidden card rounded-2xl p-6 md:p-8 mb-6">
+                <h3 class="text-xl font-bold text-white mb-3 flex items-center gap-2">
+                    <span class="text-2xl">🌊</span> Tides
+                </h3>
+                <p id="tidesStationInfo" class="text-gray-400 text-sm mb-4"></p>
+                <div id="tidesTodaySchedule" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <!-- Tide events will be inserted here -->
                 </div>
             </section>
 

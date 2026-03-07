@@ -8,6 +8,8 @@ let dailyChart = null;
 let mobileActiveTab = 'now';
 let currentAlerts = [];
 let currentAirQualityData = null;
+let currentTideData = null;
+let tideStationsCache = null;
 // Layer switching removed - Ventusky handles layers internally
 
 const US_BOUNDS = {
@@ -16,6 +18,9 @@ const US_BOUNDS = {
     minLon: -125,
     maxLon: -66
 };
+
+const TIDE_STATION_MAX_DISTANCE_MILES = 50;
+const EARTH_RADIUS_MILES = 3958.8;
 
 // Format units from API (e.g., "mp/h" -> "mph")
 function formatUnit(unit) {
@@ -62,6 +67,204 @@ function overlapHours(rangeStart, rangeEnd, targetStart, targetEnd) {
     const end = Math.min(rangeEnd.getTime(), targetEnd.getTime());
     if (end <= start) return 0;
     return (end - start) / (1000 * 60 * 60);
+}
+
+function toRadians(value) {
+    return value * (Math.PI / 180);
+}
+
+function haversineDistanceMiles(lat1, lon1, lat2, lon2) {
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return EARTH_RADIUS_MILES * c;
+}
+
+function formatNoaaDateYYYYMMDD(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}${m}${d}`;
+}
+
+function parseNoaaDateTime(dateTimeText) {
+    // NOAA format: "YYYY-MM-DD HH:mm"
+    if (!dateTimeText || typeof dateTimeText !== 'string') return null;
+    const [datePart, timePart] = dateTimeText.split(' ');
+    if (!datePart || !timePart) return null;
+    const [y, m, d] = datePart.split('-').map(Number);
+    const [hh, mm] = timePart.split(':').map(Number);
+    if ([y, m, d, hh, mm].some((v) => Number.isNaN(v))) return null;
+    return new Date(y, m - 1, d, hh, mm, 0, 0);
+}
+
+function getDateKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function formatTideHeightFeet(height) {
+    const numericHeight = Number(height);
+    if (Number.isNaN(numericHeight)) return '--';
+    return numericHeight.toFixed(1);
+}
+
+function getTideTypeLabel(typeCode) {
+    return typeCode === 'H' ? 'High' : 'Low';
+}
+
+function formatTideEventCompact(event) {
+    return `${getTideTypeLabel(event.type)} ${formatTideHeightFeet(event.height)} ft`;
+}
+
+function formatTideEventWithTime(event) {
+    return `${getTideTypeLabel(event.type)}: ${formatTideHeightFeet(event.height)} ft @ ${formatTime12Hour(event.time)}`;
+}
+
+async function fetchTideStations() {
+    if (Array.isArray(tideStationsCache) && tideStationsCache.length > 0) {
+        return tideStationsCache;
+    }
+
+    const response = await fetch('/api/tide-stations');
+    if (!response.ok) {
+        throw new Error(`Failed to fetch tide stations (${response.status})`);
+    }
+
+    const data = await response.json();
+    const stations = (data.stations || [])
+        .map((station) => {
+            const lat = Number(station.lat);
+            const lon = Number(station.lng ?? station.lon);
+            return {
+                id: String(station.id || ''),
+                name: station.name || 'Unknown Station',
+                lat,
+                lon
+            };
+        })
+        .filter((station) =>
+            station.id &&
+            Number.isFinite(station.lat) &&
+            Number.isFinite(station.lon)
+        );
+
+    tideStationsCache = stations;
+    return stations;
+}
+
+function findNearestTideStation(lat, lon, stations) {
+    let nearest = null;
+    for (const station of stations) {
+        const distanceMiles = haversineDistanceMiles(lat, lon, station.lat, station.lon);
+        if (!nearest || distanceMiles < nearest.distanceMiles) {
+            nearest = { ...station, distanceMiles };
+        }
+    }
+    return nearest;
+}
+
+function getTidesForHour(tideData, hourStart) {
+    if (!tideData?.events?.length) return [];
+    const hourEnd = new Date(hourStart.getTime() + (60 * 60 * 1000));
+    return tideData.events.filter((event) => event.time >= hourStart && event.time < hourEnd);
+}
+
+function getTidesForDay(tideData, dayDate) {
+    if (!tideData?.eventsByDay) return [];
+    return tideData.eventsByDay[getDateKey(dayDate)] || [];
+}
+
+function getTideDaySummary(tideData, dayDate) {
+    if (!tideData?.summaryByDay) return null;
+    return tideData.summaryByDay[getDateKey(dayDate)] || null;
+}
+
+function buildTideSummaryByDay(eventsByDay) {
+    const summaryByDay = {};
+    Object.keys(eventsByDay).forEach((dayKey) => {
+        const dayEvents = eventsByDay[dayKey];
+        if (!Array.isArray(dayEvents) || dayEvents.length === 0) return;
+
+        const highs = dayEvents.filter((event) => event.type === 'H');
+        const lows = dayEvents.filter((event) => event.type === 'L');
+        const highEvent = highs.length ? highs.reduce((best, event) => Number(event.height) > Number(best.height) ? event : best) : null;
+        const lowEvent = lows.length ? lows.reduce((best, event) => Number(event.height) < Number(best.height) ? event : best) : null;
+
+        summaryByDay[dayKey] = { highEvent, lowEvent };
+    });
+    return summaryByDay;
+}
+
+async function fetchTideData(lat, lon, weatherData) {
+    try {
+        const stations = await fetchTideStations();
+        const nearestStation = findNearestTideStation(lat, lon, stations);
+
+        if (!nearestStation || nearestStation.distanceMiles > TIDE_STATION_MAX_DISTANCE_MILES) {
+            return null;
+        }
+
+        const beginDate = new Date();
+        beginDate.setHours(0, 0, 0, 0);
+
+        const endDate = new Date(beginDate);
+        if (weatherData?.daily?.time?.length) {
+            const lastDailyDate = parseDateString(weatherData.daily.time[weatherData.daily.time.length - 1]);
+            endDate.setTime(lastDailyDate.getTime());
+        } else {
+            endDate.setDate(endDate.getDate() + 14);
+        }
+
+        const tideUrl = `/api/tides/datagetter?product=predictions&application=Jaccuweather&begin_date=${formatNoaaDateYYYYMMDD(beginDate)}&end_date=${formatNoaaDateYYYYMMDD(endDate)}&datum=MLLW&station=${encodeURIComponent(nearestStation.id)}&time_zone=lst_ldt&units=english&interval=hilo&format=json`;
+        const tideResponse = await fetch(tideUrl);
+        if (!tideResponse.ok) {
+            throw new Error(`Failed to fetch tide predictions (${tideResponse.status})`);
+        }
+
+        const tidePayload = await tideResponse.json();
+        const rawPredictions = Array.isArray(tidePayload.predictions) ? tidePayload.predictions : [];
+        if (!rawPredictions.length) return null;
+
+        const events = rawPredictions
+            .map((prediction) => {
+                const time = parseNoaaDateTime(prediction.t);
+                const height = Number(prediction.v);
+                const type = prediction.type === 'H' ? 'H' : (prediction.type === 'L' ? 'L' : null);
+                if (!time || !Number.isFinite(height) || !type) return null;
+                return { time, height, type };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.time.getTime() - b.time.getTime());
+
+        if (!events.length) return null;
+
+        const eventsByDay = {};
+        events.forEach((event) => {
+            const dayKey = getDateKey(event.time);
+            if (!eventsByDay[dayKey]) eventsByDay[dayKey] = [];
+            eventsByDay[dayKey].push(event);
+        });
+
+        return {
+            station: {
+                id: nearestStation.id,
+                name: nearestStation.name,
+                distanceMiles: nearestStation.distanceMiles
+            },
+            events,
+            eventsByDay,
+            summaryByDay: buildTideSummaryByDay(eventsByDay)
+        };
+    } catch (error) {
+        console.error('Tide fetch failed:', error);
+        return null;
+    }
 }
 
 // Favorites management using IndexedDB (more persistent than localStorage)
@@ -738,6 +941,7 @@ async function handleSearch() {
 async function fetchWeather(lat, lon) {
     currentLat = lat;
     currentLon = lon;
+    currentTideData = null;
     showLoading();
     hideError();
     hideContent();
@@ -821,6 +1025,7 @@ async function fetchWeather(lat, lon) {
             }
         }
 
+        currentTideData = await fetchTideData(lat, lon, weatherData);
         currentWeatherData = weatherData; // Store for modals
         displayWeather(weatherData);
         
@@ -974,6 +1179,7 @@ function displayWeather(data) {
     
     // Precipitation timing
     displayPrecipitationTiming(data);
+    renderTidesSection(data);
 
     // Hourly forecast
     const hourlyContainer = document.getElementById('hourlyForecast').querySelector('.flex');
@@ -983,6 +1189,10 @@ function displayWeather(data) {
     for (let i = 0; i < 24 && (startIndex + i) < data.hourly.time.length; i++) {
         const hourIndex = startIndex + i;
         const hour = new Date(data.hourly.time[hourIndex]);
+        const tideEvents = getTidesForHour(currentTideData, hour);
+        const tideInline = tideEvents.length
+            ? `<div class="text-cyan-300 text-[11px] mt-1">🌊 ${tideEvents.map((event) => formatTideEventCompact(event)).join(' • ')}</div>`
+            : '';
         const hourItem = document.createElement('div');
         hourItem.className = 'flex flex-col items-center bg-white/10 rounded-lg p-3 backdrop-blur-sm min-w-[80px] clickable';
         hourItem.innerHTML = `
@@ -990,6 +1200,7 @@ function displayWeather(data) {
             <div class="text-2xl mb-2">${getWeatherIcon(data.hourly.weather_code[hourIndex], data.hourly.is_day ? data.hourly.is_day[hourIndex] !== 0 : true)}</div>
             <div class="text-white font-bold text-lg">${Math.round(data.hourly.temperature_2m[hourIndex])}${data.hourly_units.temperature_2m}</div>
             <div class="text-white/60 text-xs mt-1">${data.hourly.wind_speed_10m[hourIndex]} ${formatUnit(data.hourly_units.wind_speed_10m)}</div>
+            ${tideInline}
         `;
         hourItem.addEventListener('click', () => openHourlyModal(data));
         hourlyContainer.appendChild(hourItem);
@@ -1013,6 +1224,10 @@ function displayWeather(data) {
         const apparentMax = hasApparentTemps ? Math.round(apparentMaxRaw) : null;
         const apparentMin = hasApparentTemps ? Math.round(apparentMinRaw) : null;
         const apparentUnit = data.daily_units.apparent_temperature_max || data.daily_units.temperature_2m_max;
+        const tideSummary = getTideDaySummary(currentTideData, day);
+        const tideSummaryText = tideSummary?.highEvent && tideSummary?.lowEvent
+            ? `🌊 High: ${formatTideHeightFeet(tideSummary.highEvent.height)} ft @ ${formatTime12Hour(tideSummary.highEvent.time)} / Low: ${formatTideHeightFeet(tideSummary.lowEvent.height)} ft @ ${formatTime12Hour(tideSummary.lowEvent.time)}`
+            : '';
         const dayItem = document.createElement('div');
         dayItem.className = 'flex items-center justify-between bg-white/10 rounded-lg p-4 backdrop-blur-sm clickable';
         dayItem.innerHTML = `
@@ -1021,6 +1236,7 @@ function displayWeather(data) {
                 <div>
                     <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
                     <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                    ${tideSummaryText ? `<div class="text-cyan-300 text-xs mt-1">${tideSummaryText}</div>` : ''}
                 </div>
             </div>
             <div class="flex items-center gap-6">
@@ -1053,6 +1269,44 @@ function displayWeather(data) {
         document.getElementById('hourlyHeader').addEventListener('click', () => openHourlyModal(currentWeatherData));
         document.getElementById('dailyHeader').addEventListener('click', () => openDailyModal(currentWeatherData));
     }
+}
+
+function renderTidesSection(data) {
+    const tidesSection = document.getElementById('tidesSection');
+    const stationInfo = document.getElementById('tidesStationInfo');
+    const todaySchedule = document.getElementById('tidesTodaySchedule');
+
+    if (!tidesSection || !stationInfo || !todaySchedule) return;
+
+    if (!currentTideData?.events?.length || !currentTideData.station) {
+        tidesSection.classList.add('hidden');
+        todaySchedule.innerHTML = '';
+        stationInfo.textContent = '';
+        return;
+    }
+
+    const todayDate = data?.daily?.time?.[2] ? parseDateString(data.daily.time[2]) : new Date();
+    const todayEvents = getTidesForDay(currentTideData, todayDate);
+
+    if (!todayEvents.length) {
+        tidesSection.classList.add('hidden');
+        todaySchedule.innerHTML = '';
+        stationInfo.textContent = '';
+        return;
+    }
+
+    const distanceText = `${currentTideData.station.distanceMiles.toFixed(1)} mi`;
+    stationInfo.textContent = `${currentTideData.station.name} • ${distanceText}`;
+
+    todaySchedule.innerHTML = todayEvents.map((event) => `
+        <div class="stat-card rounded-xl p-3">
+            <div class="text-cyan-300 text-sm font-semibold">🌊 ${getTideTypeLabel(event.type)}</div>
+            <div class="text-white text-lg font-bold">${formatTideHeightFeet(event.height)} ft</div>
+            <div class="text-gray-400 text-xs mt-1">${formatTime12Hour(event.time)}</div>
+        </div>
+    `).join('');
+
+    tidesSection.classList.remove('hidden');
 }
 
 function renderMobileUI(data) {
@@ -1183,6 +1437,7 @@ function renderMobileUI(data) {
         for (let i = 0; i < 12 && (startIndex + i) < data.hourly.time.length; i++) {
             const idx = startIndex + i;
             const hourTime = new Date(data.hourly.time[idx]);
+            const tideEvents = getTidesForHour(currentTideData, hourTime);
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'mobile-hour-chip';
@@ -1190,6 +1445,7 @@ function renderMobileUI(data) {
                 <div class="mobile-hour-chip-time">${formatTime12Hour(hourTime)}</div>
                 <div class="mobile-hour-chip-icon">${getWeatherIcon(data.hourly.weather_code[idx], data.hourly.is_day ? data.hourly.is_day[idx] !== 0 : true)}</div>
                 <div class="mobile-hour-chip-temp">${Math.round(data.hourly.temperature_2m[idx])}${data.hourly_units.temperature_2m}</div>
+                ${tideEvents.length ? `<div class="mobile-hour-chip-tide">🌊 ${tideEvents[0].type === 'H' ? 'H' : 'L'} ${formatTideHeightFeet(tideEvents[0].height)}</div>` : ''}
             `;
             chip.addEventListener('click', () => openHourlyModal(data));
             hourlyPreview.appendChild(chip);
@@ -1204,6 +1460,7 @@ function renderMobileUI(data) {
             const precipChance = data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined
                 ? `${data.hourly.precipitation_probability[idx]}%`
                 : '--';
+            const tideEvents = getTidesForHour(currentTideData, hourTime);
 
             const row = document.createElement('button');
             row.type = 'button';
@@ -1214,6 +1471,7 @@ function renderMobileUI(data) {
                 <span class="mobile-hour-temp mobile-forecast-temp">${Math.round(data.hourly.temperature_2m[idx])}${data.hourly_units.temperature_2m}</span>
                 <span class="mobile-hour-precip mobile-forecast-secondary">${precipChance}</span>
                 <span class="mobile-hour-wind mobile-forecast-secondary">${data.hourly.wind_speed_10m[idx]} ${formatUnit(data.hourly_units.wind_speed_10m)}</span>
+                ${tideEvents.length ? `<span class="mobile-hour-tide-row">🌊 ${tideEvents.map((event) => formatTideEventCompact(event)).join(' • ')}</span>` : ''}
             `;
             row.addEventListener('click', () => openHourlyModal(data));
             hourlyList.appendChild(row);
@@ -1229,6 +1487,10 @@ function renderMobileUI(data) {
             const precipProb = data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined
                 ? data.daily.precipitation_probability_max[dayIndex]
                 : 0;
+            const tideSummary = getTideDaySummary(currentTideData, day);
+            const tideSummaryText = tideSummary?.highEvent && tideSummary?.lowEvent
+                ? `🌊 H ${formatTideHeightFeet(tideSummary.highEvent.height)} @ ${formatTime12Hour(tideSummary.highEvent.time)} / L ${formatTideHeightFeet(tideSummary.lowEvent.height)} @ ${formatTime12Hour(tideSummary.lowEvent.time)}`
+                : '';
 
             const row = document.createElement('button');
             row.type = 'button';
@@ -1241,6 +1503,7 @@ function renderMobileUI(data) {
                     <span class="mobile-precip-fill" style="width: ${Math.max(0, Math.min(100, precipProb))}%;"></span>
                     <span class="mobile-precip-label mobile-forecast-secondary">${precipProb}%</span>
                 </span>
+                ${tideSummaryText ? `<span class="mobile-day-tide-row">${tideSummaryText}</span>` : ''}
             `;
             row.addEventListener('click', () => openDailyModal(data));
             dailyList.appendChild(row);
@@ -2912,6 +3175,10 @@ function openHourlyModal(data) {
     for (let i = 0; i < hours.length; i++) {
         const idx = startIndex + i;
         const hour = hours[i];
+        const tideEvents = getTidesForHour(currentTideData, hour);
+        const tideHtml = tideEvents.length
+            ? `<div><span class="text-white/70">Tides:</span> <span class="text-cyan-300">🌊 ${tideEvents.map((event) => formatTideEventCompact(event)).join(' • ')}</span></div>`
+            : '';
         const detailItem = document.createElement('div');
         detailItem.className = 'bg-white/10 rounded-lg p-4 backdrop-blur-sm';
         detailItem.innerHTML = `
@@ -2928,6 +3195,7 @@ function openHourlyModal(data) {
                 ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation ? `<div><span class="text-white/70">Precip:</span> <span class="text-white">${precip[i]} ${data.hourly_units.precipitation || 'in'}</span>${data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined ? ` <span class="text-white/60">(${data.hourly.precipitation_probability[idx]}%)</span>` : ''}</div>` : '')}
                 ${data.hourly.snowfall && snow[i] > 0 ? `<div><span class="text-white/70">Snow:</span> <span class="text-white">${snow[i]} ${data.hourly_units.snowfall || 'in'}</span>${data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined ? ` <span class="text-white/60">(${data.hourly.precipitation_probability[idx]}%)</span>` : ''}</div>` : ''}
                 ${data.hourly.snowfall && snow[i] > 0 ? '' : (data.hourly.precipitation_probability && data.hourly.precipitation_probability[idx] !== null && data.hourly.precipitation_probability[idx] !== undefined && !data.hourly.precipitation ? `<div><span class="text-white/70">Rain Chance:</span> <span class="text-white">${data.hourly.precipitation_probability[idx]}%</span></div>` : '')}
+                ${tideHtml}
             </div>
             <div class="mt-2 text-white/80 text-sm">${getWeatherDescription(data.hourly.weather_code[idx])}</div>
         `;
@@ -3345,6 +3613,10 @@ function openDailyModal(data) {
         const day = parseDateString(data.daily.time[dayIndex]);
         const moonPhaseValue = calculateMoonPhase(day);
         const moonPhase = getMoonPhase(moonPhaseValue);
+        const tideEvents = getTidesForDay(currentTideData, day);
+        const tideEventsHtml = tideEvents.length
+            ? tideEvents.map((event) => `<div class="text-cyan-300 text-xs">${formatTideEventWithTime(event)}</div>`).join('')
+            : '<div class="text-white/60 text-xs">No tide events</div>';
         const detailItem = document.createElement('div');
         detailItem.className = 'bg-white/10 rounded-lg p-4 backdrop-blur-sm';
         detailItem.innerHTML = `
@@ -3399,6 +3671,10 @@ function openDailyModal(data) {
                     <div class="text-white mt-0.5">
                         <span class="text-orange-400 text-xs">↓</span> <span class="text-sm font-semibold">${data.daily.sunset && data.daily.sunset[i] ? formatTime12Hour(new Date(data.daily.sunset[i])) : 'N/A'}</span>
                     </div>
+                </div>
+                <div class="bg-white/10 rounded p-3 md:col-span-2 lg:col-span-2">
+                    <div class="text-white/70 text-xs mb-1">🌊 Tides</div>
+                    ${tideEventsHtml}
                 </div>
             </div>
             <div class="mt-3 text-white/80">${getWeatherDescription(data.daily.weather_code[dayIndex])}</div>
