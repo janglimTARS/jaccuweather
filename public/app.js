@@ -2628,6 +2628,9 @@ function openHourlyModal(data) {
     modal.classList.add('active');
     setHourlyTidesVisibility(currentTideData);
 
+    const isMobileChartViewport = window.innerWidth <= 768;
+    const modalChartAspectRatio = isMobileChartViewport ? 1.2 : 2.2;
+
     // Hide all chart containers during modal animation so Chart.js doesn't
     // fire resize events while the slide-in is running (can trigger axis growth loops)
     modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'none');
@@ -2704,7 +2707,8 @@ function openHourlyModal(data) {
         type: 'line',
         options: {
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: true,
+            aspectRatio: modalChartAspectRatio,
             plugins: {
                 legend: {
                     labels: { color: '#fff' }
@@ -2911,7 +2915,8 @@ function openHourlyModal(data) {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: modalChartAspectRatio,
                 plugins: {
                     legend: {
                         labels: { color: '#fff' }
@@ -2940,7 +2945,8 @@ function openHourlyModal(data) {
             type: 'line',
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: modalChartAspectRatio,
                 plugins: {
                     legend: {
                         labels: { color: '#fff' }
@@ -3016,7 +3022,7 @@ function openHourlyModal(data) {
                 },
                 responsive: true,
                 maintainAspectRatio: true,
-                aspectRatio: 2.2,
+                aspectRatio: modalChartAspectRatio,
                 plugins: {
                     legend: {
                         labels: { color: '#fff' }
@@ -3100,6 +3106,9 @@ function openDailyModal(data) {
     const modal = document.getElementById('dailyModal');
     modal.classList.add('active');
     setDailyTidesVisibility(currentTideData);
+
+    const isMobileChartViewport = window.innerWidth <= 768;
+    const modalChartAspectRatio = isMobileChartViewport ? 1.2 : 2.2;
 
     // Hide all chart containers during modal animation so Chart.js doesn't
     // fire resize events while the slide-in is running (causes Y-axis expansion)
@@ -3306,7 +3315,8 @@ function openDailyModal(data) {
         options: {
             animation: false,
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: true,
+            aspectRatio: modalChartAspectRatio,
             plugins: {
                 legend: {
                     labels: { color: '#fff' }
@@ -3447,7 +3457,8 @@ function openDailyModal(data) {
             options: {
                 animation: false,
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: modalChartAspectRatio,
                 plugins: {
                     legend: {
                         labels: { color: '#fff' }
@@ -3476,7 +3487,8 @@ function openDailyModal(data) {
             type: 'line',
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: modalChartAspectRatio,
                 plugins: {
                     legend: {
                         labels: { color: '#fff' }
@@ -3552,7 +3564,7 @@ function openDailyModal(data) {
                 },
                 responsive: true,
                 maintainAspectRatio: true,
-                aspectRatio: 2.2,
+                aspectRatio: modalChartAspectRatio,
                 plugins: {
                     legend: {
                         labels: { color: '#fff' }
