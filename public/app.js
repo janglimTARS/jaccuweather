@@ -190,6 +190,22 @@ async function findNearestNoaaStation(lat, lon, stations) {
     };
 }
 
+function findNearbyNoaaStations(lat, lon, stations, maxDistanceKm = MAX_STATION_DISTANCE_KM) {
+    if (!Array.isArray(stations) || stations.length === 0) return [];
+
+    return stations
+        .map((station) => ({
+            ...station,
+            distance: haversineKm(lat, lon, station.lat, station.lon)
+        }))
+        .filter((station) => station.distance <= maxDistanceKm)
+        .sort((a, b) => a.distance - b.distance)
+        .map((station) => ({
+            ...station,
+            distanceMi: station.distance * 0.621371
+        }));
+}
+
 async function fetchNoaaPredictions(stationId, interval, beginDate, endDate) {
     const cacheKey = `${TIDE_CACHE_VERSION}_noaa_tide_predictions_${stationId}_${interval}_${formatDateYYYYMMDD(beginDate)}`;
     const cached = getCachedJson(cacheKey, NOAA_PREDICTIONS_CACHE_MS);
@@ -275,6 +291,8 @@ async function fetchTideDataForLocation(lat, lon, elevation) {
         nearestStation.distance <= MAX_STATION_DISTANCE_KM &&
         elevationMeters <= MAX_COASTAL_ELEVATION_M;
 
+    console.log('TIDE DEBUG:', { elevation: elevationMeters, nearestStation, distance: nearestStation?.distance });
+
     if (!isCoastal) {
         const distanceMessage = nearestStation ? `${nearestStation.distance.toFixed(1)} km` : 'no nearby station';
         const elevationMessage = Number.isFinite(elevationMeters) ? `${elevationMeters.toFixed(1)} m` : 'unknown elevation';
@@ -290,24 +308,37 @@ async function fetchTideDataForLocation(lat, lon, elevation) {
     const endDate = new Date(beginDate);
     endDate.setDate(endDate.getDate() + 14);
 
-    const [hourlyRaw, hiloRaw] = await Promise.all([
-        fetchNoaaPredictions(nearestStation.id, 'h', beginDate, endDate),
-        fetchNoaaPredictions(nearestStation.id, 'hilo', beginDate, endDate)
-    ]);
+    const candidateStations = findNearbyNoaaStations(lat, lon, stations, MAX_STATION_DISTANCE_KM);
 
-    const hourlyPredictions = hourlyRaw.map(parseNoaaPredictionRow).filter(Boolean);
-    const hiloPredictions = hiloRaw.map(parseNoaaPredictionRow).filter(Boolean);
-    if (hourlyPredictions.length === 0 || hiloPredictions.length === 0) {
-        return null;
+    for (const station of candidateStations) {
+        try {
+            const [hourlyRaw, hiloRaw] = await Promise.all([
+                fetchNoaaPredictions(station.id, 'h', beginDate, endDate),
+                fetchNoaaPredictions(station.id, 'hilo', beginDate, endDate)
+            ]);
+
+            const hourlyPredictions = hourlyRaw.map(parseNoaaPredictionRow).filter(Boolean);
+            const hiloPredictions = hiloRaw.map(parseNoaaPredictionRow).filter(Boolean);
+
+            if (hourlyPredictions.length === 0 || hiloPredictions.length === 0) {
+                console.debug(`[Tides] Skipping station ${station.id} (${station.name}) due to missing hourly/hilo data`);
+                continue;
+            }
+
+            const dailySummaries = buildTideDailySummaries(hiloPredictions, beginDate, 14);
+            return {
+                station,
+                hourlyPredictions,
+                hiloPredictions,
+                dailySummaries
+            };
+        } catch (error) {
+            console.debug(`[Tides] Station ${station.id} failed: ${error.message}`);
+        }
     }
-    const dailySummaries = buildTideDailySummaries(hiloPredictions, beginDate, 14);
 
-    return {
-        station: nearestStation,
-        hourlyPredictions,
-        hiloPredictions,
-        dailySummaries
-    };
+    console.debug('[Tides] No nearby NOAA station returned both hourly and hilo tide predictions');
+    return null;
 }
 
 function formatTideSummary(summary) {
