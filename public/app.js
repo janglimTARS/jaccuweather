@@ -854,7 +854,7 @@ function displayWeather(data) {
         dayItem.className = 'flex items-center justify-between bg-white/10 rounded-lg p-4 backdrop-blur-sm clickable';
         dayItem.innerHTML = `
             <div class="flex items-center gap-4">
-                <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex])}</div>
+                <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
                 <div>
                     <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
                     <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
@@ -1026,7 +1026,15 @@ async function displayWeeklySnowTotals(data) {
     }
 }
 
-function getWeatherIcon(code, isDay = true) {
+function getWeatherIcon(code, isDay = true, precipProbability = null) {
+    // Suppress rain/drizzle icons when precipitation probability is low (<= 30%)
+    // Downgrade to partly cloudy instead
+    if (precipProbability !== null && precipProbability <= 30) {
+        const rainCodes = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99];
+        if (rainCodes.includes(code)) {
+            code = 2; // Partly cloudy
+        }
+    }
     // WMO Weather interpretation codes
     // Night variants for clear/partly cloudy conditions
     if (!isDay) {
@@ -2926,7 +2934,7 @@ function openDailyModal(data) {
                     <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: 'long' })}</div>
                     <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
                 </div>
-                <div class="text-4xl">${getWeatherIcon(data.daily.weather_code[dayIndex])}</div>
+                <div class="text-4xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div class="bg-white/10 rounded p-3">
