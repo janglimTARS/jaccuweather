@@ -5,7 +5,15 @@ let currentWeatherData = null; // Store full weather data for modals
 let favorites = []; // Array of favorite locations
 let hourlyChart = null;
 let dailyChart = null;
+let currentTideData = null;
 // Layer switching removed - Ventusky handles layers internally
+
+const NOAA_STATIONS_URL = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions';
+const NOAA_DATAGETTER_URL = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
+const NOAA_STATIONS_CACHE_KEY = 'noaa_tide_stations_cache_v1';
+const NOAA_STATIONS_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
+const NOAA_PREDICTIONS_CACHE_MS = 24 * 60 * 60 * 1000;
+const NOAA_MAX_STATION_DISTANCE_KM = 50;
 
 const US_BOUNDS = {
     minLat: 24,
@@ -59,6 +67,252 @@ function overlapHours(rangeStart, rangeEnd, targetStart, targetEnd) {
     const end = Math.min(rangeEnd.getTime(), targetEnd.getTime());
     if (end <= start) return 0;
     return (end - start) / (1000 * 60 * 60);
+}
+
+function getCachedJson(key, maxAgeMs) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.ts || !parsed.data) return null;
+        if ((Date.now() - parsed.ts) > maxAgeMs) return null;
+        return parsed.data;
+    } catch (error) {
+        return null;
+    }
+}
+
+function setCachedJson(key, data) {
+    try {
+        localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+    } catch (error) {
+        // Ignore localStorage write failures (quota, private mode)
+    }
+}
+
+function formatDateYYYYMMDD(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+}
+
+function formatDateKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function parseNoaaDateTime(dateTimeString) {
+    if (!dateTimeString || typeof dateTimeString !== 'string') return null;
+    const [datePart, timePart] = dateTimeString.trim().split(' ');
+    if (!datePart || !timePart) return null;
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    if (![year, month, day, hours, minutes].every(Number.isFinite)) return null;
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+    const toRad = (value) => value * Math.PI / 180;
+    const earthRadiusKm = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusKm * c;
+}
+
+async function fetchNoaaStations() {
+    const cached = getCachedJson(NOAA_STATIONS_CACHE_KEY, NOAA_STATIONS_CACHE_MS);
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+        return cached;
+    }
+
+    const response = await fetch(NOAA_STATIONS_URL);
+    if (!response.ok) {
+        throw new Error(`NOAA stations request failed (${response.status})`);
+    }
+
+    const payload = await response.json();
+    const rawStations = Array.isArray(payload?.stations) ? payload.stations : [];
+    const stations = rawStations
+        .map((station) => {
+            const lat = Number(station.lat);
+            const lon = Number(station.lng ?? station.lon);
+            return {
+                id: station.id,
+                name: station.name || station.id,
+                lat,
+                lon
+            };
+        })
+        .filter((station) => station.id && Number.isFinite(station.lat) && Number.isFinite(station.lon));
+
+    if (stations.length > 0) {
+        setCachedJson(NOAA_STATIONS_CACHE_KEY, stations);
+    }
+    return stations;
+}
+
+function findNearestNoaaStation(lat, lon, stations) {
+    if (!Array.isArray(stations) || stations.length === 0) return null;
+    let nearest = null;
+
+    stations.forEach((station) => {
+        const distanceKm = haversineKm(lat, lon, station.lat, station.lon);
+        if (!nearest || distanceKm < nearest.distanceKm) {
+            nearest = { ...station, distanceKm };
+        }
+    });
+
+    if (!nearest || nearest.distanceKm > NOAA_MAX_STATION_DISTANCE_KM) {
+        return null;
+    }
+    return {
+        ...nearest,
+        distanceMi: nearest.distanceKm * 0.621371
+    };
+}
+
+async function fetchNoaaPredictions(stationId, interval, beginDate, endDate) {
+    const cacheKey = `noaa_tide_predictions_v1_${stationId}_${interval}_${formatDateYYYYMMDD(beginDate)}`;
+    const cached = getCachedJson(cacheKey, NOAA_PREDICTIONS_CACHE_MS);
+    if (cached && Array.isArray(cached)) {
+        return cached;
+    }
+
+    const params = new URLSearchParams({
+        product: 'predictions',
+        application: 'jaccuweather',
+        begin_date: formatDateYYYYMMDD(beginDate),
+        end_date: formatDateYYYYMMDD(endDate),
+        datum: 'MLLW',
+        station: stationId,
+        time_zone: 'lst_ldt',
+        units: 'english',
+        interval,
+        format: 'json'
+    });
+
+    const response = await fetch(`${NOAA_DATAGETTER_URL}?${params.toString()}`);
+    if (!response.ok) {
+        throw new Error(`NOAA predictions request failed (${response.status})`);
+    }
+
+    const payload = await response.json();
+    if (payload?.error) {
+        throw new Error(payload.error.message || 'NOAA predictions error');
+    }
+    const predictions = Array.isArray(payload?.predictions) ? payload.predictions : [];
+    setCachedJson(cacheKey, predictions);
+    return predictions;
+}
+
+function buildTideDailySummaries(hiloPredictions, startDate, days) {
+    const summaries = {};
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + days);
+
+    hiloPredictions.forEach((entry) => {
+        if (!entry?.time || !Number.isFinite(entry.value)) return;
+        if (entry.time < start || entry.time > end) return;
+
+        const dateKey = formatDateKey(entry.time);
+        if (!summaries[dateKey]) {
+            summaries[dateKey] = { high: null, low: null };
+        }
+
+        if (entry.type === 'H') {
+            if (!summaries[dateKey].high || entry.value > summaries[dateKey].high.value) {
+                summaries[dateKey].high = { value: entry.value, time: entry.time };
+            }
+        } else if (entry.type === 'L') {
+            if (!summaries[dateKey].low || entry.value < summaries[dateKey].low.value) {
+                summaries[dateKey].low = { value: entry.value, time: entry.time };
+            }
+        }
+    });
+
+    return summaries;
+}
+
+function parseNoaaPredictionRow(row) {
+    const time = parseNoaaDateTime(row?.t);
+    const value = Number(row?.v);
+    if (!time || !Number.isFinite(value)) return null;
+    return {
+        time,
+        value,
+        type: (row?.type || '').toUpperCase()
+    };
+}
+
+async function fetchTideDataForLocation(lat, lon) {
+    const stations = await fetchNoaaStations();
+    const nearestStation = findNearestNoaaStation(lat, lon, stations);
+    if (!nearestStation) return null;
+
+    const now = new Date();
+    const beginDate = new Date(now);
+    beginDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(beginDate);
+    endDate.setDate(endDate.getDate() + 14);
+
+    const [hourlyRaw, hiloRaw] = await Promise.all([
+        fetchNoaaPredictions(nearestStation.id, 'h', beginDate, endDate),
+        fetchNoaaPredictions(nearestStation.id, 'hilo', beginDate, endDate)
+    ]);
+
+    const hourlyPredictions = hourlyRaw.map(parseNoaaPredictionRow).filter(Boolean);
+    const hiloPredictions = hiloRaw.map(parseNoaaPredictionRow).filter(Boolean);
+    if (hourlyPredictions.length === 0 || hiloPredictions.length === 0) {
+        return null;
+    }
+    const dailySummaries = buildTideDailySummaries(hiloPredictions, beginDate, 14);
+
+    return {
+        station: nearestStation,
+        hourlyPredictions,
+        hiloPredictions,
+        dailySummaries
+    };
+}
+
+function formatTideSummary(summary) {
+    if (!summary || !summary.high || !summary.low) return '';
+    return `High: ${summary.high.value.toFixed(1)}ft @ ${formatTime12Hour(summary.high.time)} / Low: ${summary.low.value.toFixed(1)}ft @ ${formatTime12Hour(summary.low.time)}`;
+}
+
+function setHourlyTidesVisibility(tideData) {
+    const option = document.getElementById('hourlyTidesOption');
+    const chartContainer = document.getElementById('hourlyTidesChartContainer');
+    const subtitle = document.getElementById('hourlyTidesSubtitle');
+    if (!option || !chartContainer || !subtitle) return;
+
+    const hasTideData = Boolean(
+        tideData?.station &&
+        Array.isArray(tideData.hourlyPredictions) &&
+        tideData.hourlyPredictions.length > 0 &&
+        Array.isArray(tideData.hiloPredictions) &&
+        tideData.hiloPredictions.length > 0
+    );
+
+    if (hasTideData) {
+        option.classList.remove('hidden');
+        chartContainer.dataset.featureHidden = 'false';
+        subtitle.textContent = `${tideData.station.name} - ${tideData.station.distanceMi.toFixed(1)} mi away`;
+    } else {
+        option.classList.add('hidden');
+        chartContainer.dataset.featureHidden = 'true';
+        chartContainer.style.display = 'none';
+        subtitle.textContent = '';
+    }
 }
 
 // Favorites management using IndexedDB (more persistent than localStorage)
@@ -552,6 +806,7 @@ async function handleSearch() {
 async function fetchWeather(lat, lon) {
     currentLat = lat;
     currentLon = lon;
+    currentTideData = null;
     showLoading();
     hideError();
     hideContent();
@@ -635,6 +890,13 @@ async function fetchWeather(lat, lon) {
             }
         }
 
+        try {
+            currentTideData = await fetchTideDataForLocation(lat, lon);
+        } catch (tideError) {
+            currentTideData = null;
+            console.error('NOAA tide fetch failed:', tideError.message);
+        }
+
         currentWeatherData = weatherData; // Store for modals
         displayWeather(weatherData);
         
@@ -655,6 +917,8 @@ async function fetchWeather(lat, lon) {
 }
 
 function displayWeather(data) {
+    setHourlyTidesVisibility(currentTideData);
+
     // Use stored location name if available (from search or reverse geocoding)
     let location = currentLocationName;
     
@@ -844,6 +1108,8 @@ function displayWeather(data) {
     for (let i = 0; i < Math.min(14, data.daily.time.length - 2); i++) {
         const dayIndex = i + 2; // Skip past days
         const day = parseDateString(data.daily.time[dayIndex]);
+        const tideSummary = currentTideData?.dailySummaries ? currentTideData.dailySummaries[formatDateKey(day)] : null;
+        const tideSummaryText = formatTideSummary(tideSummary);
         const apparentMaxRaw = data.daily.apparent_temperature_max ? data.daily.apparent_temperature_max[dayIndex] : null;
         const apparentMinRaw = data.daily.apparent_temperature_min ? data.daily.apparent_temperature_min[dayIndex] : null;
         const hasApparentTemps = apparentMaxRaw !== null && apparentMaxRaw !== undefined && apparentMinRaw !== null && apparentMinRaw !== undefined;
@@ -853,25 +1119,34 @@ function displayWeather(data) {
         const dayItem = document.createElement('div');
         dayItem.className = 'flex items-center justify-between bg-white/10 rounded-lg p-4 backdrop-blur-sm clickable';
         dayItem.innerHTML = `
-            <div class="flex items-center gap-4">
-                <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
-                <div>
-                    <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
-                    <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+            <div class="w-full">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
+                        <div>
+                            <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
+                            <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div class="text-right">
+                            <div class="text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[dayIndex])}${data.daily_units.temperature_2m_max}</div>
+                            <div class="text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[dayIndex])}${data.daily_units.temperature_2m_min}</div>
+                            ${hasApparentTemps ? `<div class="text-white/50 text-xs">Feels like ${apparentMax}${apparentUnit} / ${apparentMin}${apparentUnit}</div>` : ''}
+                        </div>
+                        <div class="text-white/70 text-sm text-right min-w-[100px]">
+                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[dayIndex] || 0} ${data.daily_units.precipitation_sum}</div>`}
+                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[dayIndex]} ${data.daily_units.snowfall_sum || 'in'}</div>` : ''}
+                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '')}
+                            <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[dayIndex]} ${formatUnit(data.daily_units.wind_speed_10m_max)}</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="flex items-center gap-6">
-                <div class="text-right">
-                    <div class="text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[dayIndex])}${data.daily_units.temperature_2m_max}</div>
-                    <div class="text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[dayIndex])}${data.daily_units.temperature_2m_min}</div>
-                    ${hasApparentTemps ? `<div class="text-white/50 text-xs">Feels like ${apparentMax}${apparentUnit} / ${apparentMin}${apparentUnit}</div>` : ''}
+                ${tideSummaryText ? `
+                <div class="mt-3 pt-3 border-t border-cyan-400/20 text-cyan-100/90 text-xs md:text-sm">
+                    <i class="fas fa-water mr-2 text-cyan-300/90"></i>${tideSummaryText}
                 </div>
-                <div class="text-white/70 text-sm text-right min-w-[100px]">
-                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[dayIndex] || 0} ${data.daily_units.precipitation_sum}</div>`}
-                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[dayIndex]} ${data.daily_units.snowfall_sum || 'in'}</div>` : ''}
-                    ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '')}
-                    <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[dayIndex]} ${formatUnit(data.daily_units.wind_speed_10m_max)}</div>
-                </div>
+                ` : ''}
             </div>
         `;
         
@@ -2192,6 +2467,10 @@ function initializeChartSelector(selectId) {
         const selectedValue = select.value;
 
         chartContainers.forEach(container => {
+            if (container.dataset.featureHidden === 'true') {
+                container.style.display = 'none';
+                return;
+            }
             if (selectedValue === 'all') {
                 container.style.display = 'block';
             } else {
@@ -2213,6 +2492,7 @@ function initializeChartSelector(selectId) {
 function openHourlyModal(data) {
     const modal = document.getElementById('hourlyModal');
     modal.classList.add('active');
+    setHourlyTidesVisibility(currentTideData);
     
     // Destroy existing charts if they exist
     if (hourlyChart) {
@@ -2301,6 +2581,84 @@ function openHourlyModal(data) {
     
     // Check if there's any snow in the hourly forecast
     const hasSnowHourly = snow.some(val => val > 0);
+
+    const tideChartContainer = document.getElementById('hourlyTidesChartContainer');
+    const tideChartCanvas = document.getElementById('hourlyTidesChart');
+    const nowMs = Date.now();
+    const end48hMs = nowMs + (48 * 60 * 60 * 1000);
+    const tideHourly48h = currentTideData?.hourlyPredictions
+        ? currentTideData.hourlyPredictions.filter((point) => {
+            const pointTimeMs = point.time.getTime();
+            return pointTimeMs >= nowMs && pointTimeMs <= end48hMs;
+        })
+        : [];
+
+    const hasTideData = tideHourly48h.length >= 2;
+    if (tideChartContainer) {
+        tideChartContainer.dataset.featureHidden = hasTideData ? 'false' : 'true';
+    }
+
+    let tideLabels = [];
+    let tideValues = [];
+    let tideHighMarkers = [];
+    let tideLowMarkers = [];
+    let tideMarkerLabels = [];
+
+    if (hasTideData) {
+        tideLabels = tideHourly48h.map((point) => formatTime12Hour(point.time));
+        tideValues = tideHourly48h.map((point) => point.value);
+        tideHighMarkers = new Array(tideHourly48h.length).fill(null);
+        tideLowMarkers = new Array(tideHourly48h.length).fill(null);
+
+        const hilo48h = currentTideData.hiloPredictions.filter((point) => {
+            const pointTimeMs = point.time.getTime();
+            return pointTimeMs >= nowMs && pointTimeMs <= end48hMs;
+        });
+
+        hilo48h.forEach((point) => {
+            let closestIdx = 0;
+            let minDiff = Infinity;
+            for (let idx = 0; idx < tideHourly48h.length; idx++) {
+                const diff = Math.abs(tideHourly48h[idx].time.getTime() - point.time.getTime());
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIdx = idx;
+                }
+            }
+
+            // Only mark events within 90 minutes of an hourly point.
+            if (minDiff > 90 * 60 * 1000) return;
+
+            if (point.type === 'H') {
+                tideHighMarkers[closestIdx] = point.value;
+                tideMarkerLabels.push({ index: closestIdx, value: point.value, text: 'H' });
+            } else if (point.type === 'L') {
+                tideLowMarkers[closestIdx] = point.value;
+                tideMarkerLabels.push({ index: closestIdx, value: point.value, text: 'L' });
+            }
+        });
+    }
+
+    const tideMarkerLabelPlugin = {
+        id: 'tideMarkerLabelPlugin',
+        afterDatasetsDraw(chart) {
+            if (!chart?.$tideMarkerLabels || chart.$tideMarkerLabels.length === 0) return;
+            const { ctx, scales } = chart;
+            const xScale = scales.x;
+            const yScale = scales.y;
+            ctx.save();
+            ctx.fillStyle = '#67e8f9';
+            ctx.font = '600 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+
+            chart.$tideMarkerLabels.forEach((point) => {
+                const x = xScale.getPixelForValue(point.index);
+                const y = yScale.getPixelForValue(point.value);
+                ctx.fillText(point.text, x, y - 10);
+            });
+            ctx.restore();
+        }
+    };
     
     hourlyChart = {
         temp: new Chart(document.getElementById('hourlyTempChart'), {
@@ -2472,8 +2830,77 @@ function openHourlyModal(data) {
                     fill: true
                 }]
             }
-        })
+        }),
+        tides: (hasTideData && tideChartCanvas) ? new Chart(tideChartCanvas, {
+            type: 'line',
+            data: {
+                labels: tideLabels,
+                datasets: [
+                    {
+                        label: 'Tide Height (ft, MLLW)',
+                        data: tideValues,
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                        tension: 0.45,
+                        fill: true,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'High Tide',
+                        data: tideHighMarkers,
+                        borderColor: '#67e8f9',
+                        backgroundColor: '#67e8f9',
+                        pointRadius: 4,
+                        pointHoverRadius: 5,
+                        pointStyle: 'circle',
+                        showLine: false
+                    },
+                    {
+                        label: 'Low Tide',
+                        data: tideLowMarkers,
+                        borderColor: '#22d3ee',
+                        backgroundColor: '#22d3ee',
+                        pointRadius: 4,
+                        pointHoverRadius: 5,
+                        pointStyle: 'rectRot',
+                        showLine: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} ft`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#fff',
+                            callback: (value) => `${value} ft`
+                        },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                }
+            },
+            plugins: [tideMarkerLabelPlugin]
+        }) : null
     };
+
+    if (hourlyChart.tides) {
+        hourlyChart.tides.$tideMarkerLabels = tideMarkerLabels;
+    }
     
     // Hide/show precipitation and snow charts based on data
     const hourlyPrecipChartContainer = document.getElementById('hourlyPrecipChart').parentElement;
