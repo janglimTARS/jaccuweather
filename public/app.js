@@ -13,7 +13,9 @@ const NOAA_DATAGETTER_URL = 'https://api.tidesandcurrents.noaa.gov/api/prod/data
 const NOAA_STATIONS_CACHE_KEY = 'noaa_tide_stations_cache_v1';
 const NOAA_STATIONS_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const NOAA_PREDICTIONS_CACHE_MS = 24 * 60 * 60 * 1000;
+const NOAA_STATION_DETAILS_CACHE_MS = 30 * 24 * 60 * 60 * 1000;
 const NOAA_MAX_STATION_DISTANCE_KM = 50;
+const NOAA_INLAND_WATERWAY_PATTERN = /\b(river|creek|canal|lake|tributary|brook|fork|branch|slough)\b/i;
 
 const US_BOUNDS = {
     minLat: 24,
@@ -158,24 +160,64 @@ async function fetchNoaaStations() {
     return stations;
 }
 
-function findNearestNoaaStation(lat, lon, stations) {
-    if (!Array.isArray(stations) || stations.length === 0) return null;
-    let nearest = null;
+async function fetchNoaaStationDetails(stationId) {
+    if (!stationId) return null;
 
-    stations.forEach((station) => {
-        const distanceKm = haversineKm(lat, lon, station.lat, station.lon);
-        if (!nearest || distanceKm < nearest.distanceKm) {
-            nearest = { ...station, distanceKm };
-        }
-    });
+    const cacheKey = `noaa_tide_station_details_v1_${stationId}`;
+    const cached = getCachedJson(cacheKey, NOAA_STATION_DETAILS_CACHE_MS);
+    if (cached) return cached;
 
-    if (!nearest || nearest.distanceKm > NOAA_MAX_STATION_DISTANCE_KM) {
+    try {
+        const response = await fetch(`https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${stationId}.json`);
+        if (!response.ok) return null;
+        const payload = await response.json();
+        const station = Array.isArray(payload?.stations) ? payload.stations[0] : null;
+        if (!station) return null;
+
+        const details = {
+            id: station.id,
+            fullName: station.name || '',
+            isInlandWaterway: NOAA_INLAND_WATERWAY_PATTERN.test(station.name || '')
+        };
+        setCachedJson(cacheKey, details);
+        return details;
+    } catch (error) {
         return null;
     }
-    return {
-        ...nearest,
-        distanceMi: nearest.distanceKm * 0.621371
-    };
+}
+
+async function findNearestNoaaStation(lat, lon, stations) {
+    if (!Array.isArray(stations) || stations.length === 0) return null;
+
+    const sortedStations = stations
+        .map((station) => ({ ...station, distanceKm: haversineKm(lat, lon, station.lat, station.lon) }))
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    const nearestCandidate = sortedStations[0];
+    if (nearestCandidate) {
+        console.debug(`[Tides] Nearest NOAA station candidate: ${nearestCandidate.name} (${nearestCandidate.id}) at ${nearestCandidate.distanceKm.toFixed(1)} km`);
+    }
+
+    for (const station of sortedStations) {
+        if (station.distanceKm > NOAA_MAX_STATION_DISTANCE_KM) {
+            break;
+        }
+
+        const stationDetails = await fetchNoaaStationDetails(station.id);
+        if (stationDetails?.isInlandWaterway) {
+            console.debug(`[Tides] Skipping inland station ${stationDetails.fullName || station.name} (${station.id}) at ${station.distanceKm.toFixed(1)} km`);
+            continue;
+        }
+
+        console.debug(`[Tides] Using station ${station.name} (${station.id}) at ${station.distanceKm.toFixed(1)} km`);
+        return {
+            ...station,
+            distanceMi: station.distanceKm * 0.621371
+        };
+    }
+
+    console.debug(`[Tides] No eligible coastal NOAA station within ${NOAA_MAX_STATION_DISTANCE_KM} km`);
+    return null;
 }
 
 async function fetchNoaaPredictions(stationId, interval, beginDate, endDate) {
@@ -255,7 +297,7 @@ function parseNoaaPredictionRow(row) {
 
 async function fetchTideDataForLocation(lat, lon) {
     const stations = await fetchNoaaStations();
-    const nearestStation = findNearestNoaaStation(lat, lon, stations);
+    const nearestStation = await findNearestNoaaStation(lat, lon, stations);
     if (!nearestStation) return null;
 
     const now = new Date();
@@ -2546,6 +2588,10 @@ function openHourlyModal(data) {
     const modal = document.getElementById('hourlyModal');
     modal.classList.add('active');
     setHourlyTidesVisibility(currentTideData);
+
+    // Hide all chart containers during modal animation so Chart.js doesn't
+    // fire resize events while the slide-in is running (can trigger axis growth loops)
+    modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'none');
     
     // Destroy existing charts if they exist
     if (hourlyChart) {
@@ -2637,6 +2683,9 @@ function openHourlyModal(data) {
 
     const tideChartContainer = document.getElementById('hourlyTidesChartContainer');
     const tideChartCanvas = document.getElementById('hourlyTidesChart');
+    if (tideChartCanvas) {
+        tideChartCanvas.height = 220;
+    }
     const nowMs = Date.now();
     const end48hMs = nowMs + (48 * 60 * 60 * 1000);
     const tideHourly48h = currentTideData?.hourlyPredictions
@@ -2927,7 +2976,8 @@ function openHourlyModal(data) {
                     duration: 0
                 },
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: 2.2,
                 plugins: {
                     legend: {
                         labels: { color: '#fff' }
@@ -3003,8 +3053,8 @@ function openHourlyModal(data) {
         detailsContainer.appendChild(detailItem);
     }
 
-    // Initialize chart selection dropdown
-    initializeChartSelector('hourlyChartSelect');
+    // Reveal charts after modal slide-in animation completes (300ms)
+    setTimeout(() => initializeChartSelector('hourlyChartSelect'), 320);
 }
 
 function openDailyModal(data) {
