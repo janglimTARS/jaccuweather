@@ -24,6 +24,135 @@ const US_BOUNDS = {
     maxLon: -66
 };
 
+const CHART_SCRUB_EVENTS = ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend', 'touchcancel'];
+const CHART_TOOLTIP_BASE = {
+    enabled: true,
+    mode: 'index',
+    intersect: false,
+    position: 'nearest',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    titleColor: '#fff',
+    bodyColor: '#fff',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    padding: 12,
+    displayColors: true,
+    caretSize: 0
+};
+
+function setChartCrosshairFromEvent(chart, event) {
+    if (!chart || !event || !chart.chartArea) return false;
+
+    const active = chart.getElementsAtEventForMode(event, 'index', {
+        intersect: false,
+        axis: 'x'
+    }, false);
+
+    if (!active.length) {
+        chart.crosshairX = undefined;
+        chart.setActiveElements([]);
+        if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+        return true;
+    }
+
+    const firstPoint = active[0];
+    const pointElement = chart.getDatasetMeta(firstPoint.datasetIndex)?.data?.[firstPoint.index];
+    const crosshairX = pointElement?.x;
+
+    if (crosshairX === undefined || crosshairX === null) return false;
+
+    chart.crosshairX = crosshairX;
+    chart.setActiveElements(active);
+    if (chart.tooltip) {
+        chart.tooltip.setActiveElements(active, {
+            x: crosshairX,
+            y: chart.chartArea.top
+        });
+    }
+
+    return true;
+}
+
+function withChartScrubbing(options = {}) {
+    const existingPlugins = options.plugins || {};
+    const existingTooltip = existingPlugins.tooltip || {};
+
+    return {
+        ...options,
+        events: options.events || CHART_SCRUB_EVENTS,
+        interaction: {
+            mode: 'index',
+            intersect: false,
+            axis: 'x',
+            ...(options.interaction || {})
+        },
+        onHover: (event, _elements, chart) => {
+            if (!chart || !event) return;
+            if (event.type === 'mouseout') {
+                chart.crosshairX = undefined;
+                chart.setActiveElements([]);
+                if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+                chart.draw();
+                return;
+            }
+            if (setChartCrosshairFromEvent(chart, event)) {
+                chart.draw();
+            }
+        },
+        plugins: {
+            ...existingPlugins,
+            tooltip: {
+                ...CHART_TOOLTIP_BASE,
+                ...existingTooltip
+            }
+        }
+    };
+}
+
+const crosshairPlugin = {
+    id: 'crosshair',
+    afterEvent(chart, args) {
+        const event = args?.event;
+        if (!event) return;
+
+        if (event.type === 'touchend' || event.type === 'touchcancel' || event.type === 'mouseout') {
+            if (chart.crosshairX !== undefined) {
+                chart.crosshairX = undefined;
+                chart.setActiveElements([]);
+                if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+                chart.draw();
+            }
+            return;
+        }
+
+        if (event.type === 'mousemove' || event.type === 'touchmove' || event.type === 'touchstart') {
+            if (setChartCrosshairFromEvent(chart, event)) {
+                chart.draw();
+            }
+        }
+    },
+    afterDraw(chart) {
+        if (chart.crosshairX === undefined || !chart.chartArea) return;
+
+        const { ctx, chartArea } = chart;
+        const x = chart.crosshairX;
+        if (x < chartArea.left || x > chartArea.right) return;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.stroke();
+        ctx.restore();
+    }
+};
+
+if (window.Chart) {
+    Chart.register(crosshairPlugin);
+}
+
 // Format units from API (e.g., "mp/h" -> "mph")
 function formatUnit(unit) {
     if (!unit) return '';
@@ -2705,7 +2834,7 @@ function openHourlyModal(data) {
     // Create charts
     const chartConfig = {
         type: 'line',
-        options: {
+        options: withChartScrubbing({
             responsive: true,
             maintainAspectRatio: true,
             aspectRatio: modalChartAspectRatio,
@@ -2718,7 +2847,7 @@ function openHourlyModal(data) {
                 x: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
                 y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
             }
-        }
+        })
     };
     
     // Check if there's any snow in the hourly forecast
@@ -2913,7 +3042,7 @@ function openHourlyModal(data) {
                     }
                 ]
             },
-            options: {
+            options: withChartScrubbing({
                 responsive: true,
                 maintainAspectRatio: true,
                 aspectRatio: modalChartAspectRatio,
@@ -2939,11 +3068,11 @@ function openHourlyModal(data) {
                         grid: { color: 'rgba(255,255,255,0.1)' }
                     }
                 }
-            }
+            })
         }),
         brightness: new Chart(document.getElementById('hourlyBrightnessChart'), {
             type: 'line',
-            options: {
+            options: withChartScrubbing({
                 responsive: true,
                 maintainAspectRatio: true,
                 aspectRatio: modalChartAspectRatio,
@@ -2967,7 +3096,7 @@ function openHourlyModal(data) {
                         grid: { color: 'rgba(255,255,255,0.1)' }
                     }
                 }
-            },
+            }),
             data: {
                 labels,
                 datasets: [{
@@ -3016,7 +3145,7 @@ function openHourlyModal(data) {
                     }
                 ]
             },
-            options: {
+            options: withChartScrubbing({
                 animation: {
                     duration: 0
                 },
@@ -3049,7 +3178,7 @@ function openHourlyModal(data) {
                         grid: { color: 'rgba(255,255,255,0.1)' }
                     }
                 }
-            },
+            }),
             plugins: [tideMarkerLabelPlugin]
         }) : null
     };
@@ -3312,7 +3441,7 @@ function openDailyModal(data) {
     // Create charts
     const chartConfig = {
         type: 'line',
-        options: {
+        options: withChartScrubbing({
             animation: false,
             responsive: true,
             maintainAspectRatio: true,
@@ -3326,7 +3455,7 @@ function openDailyModal(data) {
                 x: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
                 y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
             }
-        }
+        })
     };
     
     dailyChart = {
@@ -3454,7 +3583,7 @@ function openDailyModal(data) {
                     }
                 ]
             },
-            options: {
+            options: withChartScrubbing({
                 animation: false,
                 responsive: true,
                 maintainAspectRatio: true,
@@ -3481,11 +3610,11 @@ function openDailyModal(data) {
                         grid: { color: 'rgba(255,255,255,0.1)' }
                     }
                 }
-            }
+            })
         }),
         brightness: new Chart(document.getElementById('dailyBrightnessChart'), {
             type: 'line',
-            options: {
+            options: withChartScrubbing({
                 responsive: true,
                 maintainAspectRatio: true,
                 aspectRatio: modalChartAspectRatio,
@@ -3509,7 +3638,7 @@ function openDailyModal(data) {
                         grid: { color: 'rgba(255,255,255,0.1)' }
                     }
                 }
-            },
+            }),
             data: {
                 labels,
                 datasets: [{
@@ -3558,7 +3687,7 @@ function openDailyModal(data) {
                     }
                 ]
             },
-            options: {
+            options: withChartScrubbing({
                 animation: {
                     duration: 0
                 },
@@ -3606,7 +3735,7 @@ function openDailyModal(data) {
                         grid: { color: 'rgba(255,255,255,0.1)' }
                     }
                 }
-            },
+            }),
             plugins: [dailyTideMarkerLabelPlugin]
         }) : null,
         moonPhase: new Chart(document.getElementById('dailyMoonPhaseChart'), {
@@ -3622,7 +3751,7 @@ function openDailyModal(data) {
                     fill: true
                 }]
             },
-            options: {
+            options: withChartScrubbing({
                 ...chartConfig.options,
                 scales: {
                     ...chartConfig.options.scales,
@@ -3651,7 +3780,7 @@ function openDailyModal(data) {
                         }
                     }
                 }
-            }
+            })
         })
     };
 
