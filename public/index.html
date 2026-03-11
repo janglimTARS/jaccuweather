@@ -626,6 +626,7 @@
                             <option value="snow">Snowfall</option>
                             <option value="cloud">Cloud Cover</option>
                             <option value="brightness">Brightness</option>
+                            <option id="dailyTidesOption" value="tides" class="hidden">Tides</option>
                             <option value="moon">Moon Phase</option>
                         </select>
                     </div>
@@ -658,6 +659,11 @@
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="brightness">
                     <canvas id="dailyBrightnessChart" style="height: 250px;"></canvas>
+                </div>
+                <div id="dailyTidesChartContainer" class="card rounded-xl p-4 chart-container" data-chart-type="tides" data-feature-hidden="true">
+                    <div class="mb-2 text-sm font-semibold text-cyan-100">14-Day Tide Forecast</div>
+                    <div id="dailyTidesSubtitle" class="mb-3 text-cyan-200/80 text-sm"></div>
+                    <canvas id="dailyTidesChart" style="height: 250px;"></canvas>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="moon">
                     <canvas id="dailyMoonPhaseChart" style="height: 250px;"></canvas>
