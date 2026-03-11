@@ -10,10 +10,12 @@ let currentTideData = null;
 
 const NOAA_STATIONS_URL = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions';
 const NOAA_DATAGETTER_URL = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
-const NOAA_STATIONS_CACHE_KEY = 'noaa_tide_stations_cache_v2';
+const TIDE_CACHE_VERSION = 'v2';
+const NOAA_STATIONS_CACHE_KEY = `${TIDE_CACHE_VERSION}_noaa_tide_stations_cache`;
 const NOAA_STATIONS_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const NOAA_PREDICTIONS_CACHE_MS = 24 * 60 * 60 * 1000;
-const NOAA_MAX_STATION_DISTANCE_KM = 15;
+const MAX_STATION_DISTANCE_KM = 50;
+const MAX_COASTAL_ELEVATION_M = 20;
 
 const US_BOUNDS = {
     minLat: 24,
@@ -132,7 +134,7 @@ function normalizeNoaaStations(rawStations) {
     return rawStations
         .map((station) => {
             const lat = Number(station?.lat);
-            const lon = Number(station?.lon ?? station?.lng ?? station?.long);
+            const lon = Number(station?.lng ?? station?.lon ?? station?.long);
             return {
                 id: station?.id,
                 name: station?.name || station?.id,
@@ -171,28 +173,25 @@ async function findNearestNoaaStation(lat, lon, stations) {
     if (!Array.isArray(stations) || stations.length === 0) return null;
 
     const sortedStations = stations
-        .map((station) => ({ ...station, distanceKm: haversineKm(lat, lon, station.lat, station.lon) }))
-        .sort((a, b) => a.distanceKm - b.distanceKm);
+        .map((station) => ({
+            ...station,
+            distance: haversineKm(lat, lon, station.lat, station.lon)
+        }))
+        .sort((a, b) => a.distance - b.distance);
 
     const nearestCandidate = sortedStations[0];
     if (!nearestCandidate) return null;
 
-    console.debug(`[Tides] Nearest NOAA station candidate: ${nearestCandidate.name} (${nearestCandidate.id}) at ${nearestCandidate.distanceKm.toFixed(1)} km`);
+    console.debug(`[Tides] Nearest NOAA station candidate: ${nearestCandidate.name} (${nearestCandidate.id}) at ${nearestCandidate.distance.toFixed(1)} km`);
 
-    if (nearestCandidate.distanceKm > NOAA_MAX_STATION_DISTANCE_KM) {
-        console.debug(`[Tides] No eligible coastal NOAA station within ${NOAA_MAX_STATION_DISTANCE_KM} km`);
-        return null;
-    }
-
-    console.debug(`[Tides] Using station ${nearestCandidate.name} (${nearestCandidate.id}) at ${nearestCandidate.distanceKm.toFixed(1)} km`);
     return {
         ...nearestCandidate,
-        distanceMi: nearestCandidate.distanceKm * 0.621371
+        distanceMi: nearestCandidate.distance * 0.621371
     };
 }
 
 async function fetchNoaaPredictions(stationId, interval, beginDate, endDate) {
-    const cacheKey = `noaa_tide_predictions_v1_${stationId}_${interval}_${formatDateYYYYMMDD(beginDate)}`;
+    const cacheKey = `${TIDE_CACHE_VERSION}_noaa_tide_predictions_${stationId}_${interval}_${formatDateYYYYMMDD(beginDate)}`;
     const cached = getCachedJson(cacheKey, NOAA_PREDICTIONS_CACHE_MS);
     if (cached && Array.isArray(cached)) {
         return cached;
@@ -266,10 +265,24 @@ function parseNoaaPredictionRow(row) {
     };
 }
 
-async function fetchTideDataForLocation(lat, lon) {
+async function fetchTideDataForLocation(lat, lon, elevation) {
     const stations = await fetchNoaaStations();
     const nearestStation = await findNearestNoaaStation(lat, lon, stations);
-    if (!nearestStation) return null;
+
+    const elevationMeters = Number(elevation);
+    const isCoastal = Number.isFinite(elevationMeters) &&
+        nearestStation &&
+        nearestStation.distance <= MAX_STATION_DISTANCE_KM &&
+        elevationMeters <= MAX_COASTAL_ELEVATION_M;
+
+    if (!isCoastal) {
+        const distanceMessage = nearestStation ? `${nearestStation.distance.toFixed(1)} km` : 'no nearby station';
+        const elevationMessage = Number.isFinite(elevationMeters) ? `${elevationMeters.toFixed(1)} m` : 'unknown elevation';
+        console.debug(`[Tides] Hidden for inland/non-coastal location (station: ${distanceMessage}, elevation: ${elevationMessage})`);
+        return null;
+    }
+
+    console.debug(`[Tides] Coastal location confirmed (station: ${nearestStation.distance.toFixed(1)} km, elevation: ${elevationMeters.toFixed(1)} m)`);
 
     const now = new Date();
     const beginDate = new Date(now);
@@ -980,7 +993,7 @@ async function fetchWeather(lat, lon) {
         }
 
         try {
-            currentTideData = await fetchTideDataForLocation(lat, lon);
+            currentTideData = await fetchTideDataForLocation(lat, lon, weatherData.elevation);
         } catch (tideError) {
             currentTideData = null;
             console.error('NOAA tide fetch failed:', tideError.message);
