@@ -3058,7 +3058,8 @@ document.addEventListener('keydown', (e) => {
 function buildVentuskyUrl(lat, lon) {
     const isMobile = window.innerWidth <= 768;
     const zoom = isMobile ? 7 : 8; // Lower zoom on mobile (more zoomed out)
-    return `/ventusky-proxy/precipitation-map?p=${lat};${lon};${zoom}&l=rain`;
+    // Use root map URL because /precipitation-map currently 302-redirects upstream.
+    return `/ventusky-proxy/?p=${lat};${lon};${zoom}&l=rain`;
 }
 
 function setRadarFallback(visible, lat, lon) {
@@ -3066,7 +3067,7 @@ function setRadarFallback(visible, lat, lon) {
     const fallbackLink = document.getElementById('radarFallbackLink');
     if (!fallback || !fallbackLink) return;
 
-    const directUrl = `https://www.ventusky.com/precipitation-map?p=${lat};${lon};7&l=rain`;
+    const directUrl = `https://www.ventusky.com/?p=${lat};${lon};7&l=rain`;
     fallbackLink.href = directUrl;
     fallback.classList.toggle('hidden', !visible);
 }
