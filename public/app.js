@@ -369,6 +369,51 @@ async function fetchNoaaPredictions(stationId, interval, beginDate, endDate) {
     return predictions;
 }
 
+function interpolateTideCurve(hiloPoints, intervalMinutes = 15) {
+    if (!Array.isArray(hiloPoints) || hiloPoints.length < 2) return [];
+
+    const sorted = hiloPoints
+        .filter((point) => point?.time instanceof Date && Number.isFinite(point.value))
+        .slice()
+        .sort((a, b) => a.time.getTime() - b.time.getTime());
+
+    if (sorted.length < 2) return [];
+
+    const intervalMs = Math.max(1, Number(intervalMinutes) || 15) * 60 * 1000;
+    const curve = [];
+    const seen = new Set();
+
+    const pushPoint = (timeMs, value) => {
+        if (seen.has(timeMs) || !Number.isFinite(value)) return;
+        seen.add(timeMs);
+        curve.push({
+            time: new Date(timeMs),
+            value: Number(value.toFixed(3)),
+            type: ''
+        });
+    };
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+        const start = sorted[i];
+        const end = sorted[i + 1];
+        const startMs = start.time.getTime();
+        const endMs = end.time.getTime();
+        const spanMs = endMs - startMs;
+
+        if (spanMs <= 0) continue;
+
+        for (let tMs = startMs; tMs < endMs; tMs += intervalMs) {
+            const t = (tMs - startMs) / spanMs;
+            const value = start.value + (end.value - start.value) * ((1 - Math.cos(Math.PI * t)) / 2);
+            pushPoint(tMs, value);
+        }
+
+        pushPoint(endMs, end.value);
+    }
+
+    return curve;
+}
+
 function buildTideDailySummaries(hiloPredictions, startDate, days) {
     const summaries = {};
     const start = new Date(startDate);
@@ -441,23 +486,24 @@ async function fetchTideDataForLocation(lat, lon, elevation) {
 
     for (const station of candidateStations) {
         try {
-            const [hourlyRaw, hiloRaw] = await Promise.all([
-                fetchNoaaPredictions(station.id, 'h', beginDate, endDate),
-                fetchNoaaPredictions(station.id, 'hilo', beginDate, endDate)
-            ]);
-
-            const hourlyPredictions = hourlyRaw.map(parseNoaaPredictionRow).filter(Boolean);
+            const hiloRaw = await fetchNoaaPredictions(station.id, 'hilo', beginDate, endDate);
             const hiloPredictions = hiloRaw.map(parseNoaaPredictionRow).filter(Boolean);
 
-            if (hourlyPredictions.length === 0 || hiloPredictions.length === 0) {
-                console.debug(`[Tides] Skipping station ${station.id} (${station.name}) due to missing hourly/hilo data`);
+            if (hiloPredictions.length < 2) {
+                console.debug(`[Tides] Skipping station ${station.id} (${station.name}) due to missing hilo data`);
+                continue;
+            }
+
+            const interpolatedPredictions = interpolateTideCurve(hiloPredictions, 15);
+            if (interpolatedPredictions.length < 2) {
+                console.debug(`[Tides] Skipping station ${station.id} (${station.name}) due to insufficient interpolated curve points`);
                 continue;
             }
 
             const dailySummaries = buildTideDailySummaries(hiloPredictions, beginDate, 14);
             return {
                 station,
-                hourlyPredictions,
+                interpolatedPredictions,
                 hiloPredictions,
                 dailySummaries
             };
@@ -466,7 +512,7 @@ async function fetchTideDataForLocation(lat, lon, elevation) {
         }
     }
 
-    console.debug('[Tides] No nearby NOAA station returned both hourly and hilo tide predictions');
+    console.debug('[Tides] No nearby NOAA station returned valid hilo tide predictions');
     return null;
 }
 
@@ -531,8 +577,8 @@ function setHourlyTidesVisibility(tideData) {
 
     const hasTideData = Boolean(
         tideData?.station &&
-        Array.isArray(tideData.hourlyPredictions) &&
-        tideData.hourlyPredictions.length > 0 &&
+        Array.isArray(tideData.interpolatedPredictions) &&
+        tideData.interpolatedPredictions.length > 0 &&
         Array.isArray(tideData.hiloPredictions) &&
         tideData.hiloPredictions.length > 0
     );
@@ -558,8 +604,8 @@ function setDailyTidesVisibility(tideData) {
 
     const hasTideData = Boolean(
         tideData?.station &&
-        Array.isArray(tideData.hourlyPredictions) &&
-        tideData.hourlyPredictions.length > 1 &&
+        Array.isArray(tideData.interpolatedPredictions) &&
+        tideData.interpolatedPredictions.length > 1 &&
         Array.isArray(tideData.hiloPredictions) &&
         tideData.hiloPredictions.length > 1
     );
@@ -2860,14 +2906,14 @@ function openHourlyModal(data) {
     }
     const nowMs = Date.now();
     const end48hMs = nowMs + (48 * 60 * 60 * 1000);
-    const tideHourly48h = currentTideData?.hourlyPredictions
-        ? currentTideData.hourlyPredictions.filter((point) => {
+    const tideCurve48h = currentTideData?.interpolatedPredictions
+        ? currentTideData.interpolatedPredictions.filter((point) => {
             const pointTimeMs = point.time.getTime();
             return pointTimeMs >= nowMs && pointTimeMs <= end48hMs;
         })
         : [];
 
-    const hasTideData = tideHourly48h.length >= 2;
+    const hasTideData = tideCurve48h.length >= 2;
     if (tideChartContainer) {
         tideChartContainer.dataset.featureHidden = hasTideData ? 'false' : 'true';
     }
@@ -2880,11 +2926,11 @@ function openHourlyModal(data) {
     let tideYAxisBounds = { min: -1, max: 1 };
 
     if (hasTideData) {
-        tideLabels = tideHourly48h.map((point) => formatTime12Hour(point.time));
-        tideValues = tideHourly48h.map((point) => point.value);
+        tideLabels = tideCurve48h.map((point) => formatTime12Hour(point.time));
+        tideValues = tideCurve48h.map((point) => point.value);
         tideYAxisBounds = computeTideYAxisBounds(tideValues);
-        tideHighMarkers = new Array(tideHourly48h.length).fill(null);
-        tideLowMarkers = new Array(tideHourly48h.length).fill(null);
+        tideHighMarkers = new Array(tideCurve48h.length).fill(null);
+        tideLowMarkers = new Array(tideCurve48h.length).fill(null);
 
         const hilo48h = currentTideData.hiloPredictions.filter((point) => {
             const pointTimeMs = point.time.getTime();
@@ -2894,16 +2940,16 @@ function openHourlyModal(data) {
         hilo48h.forEach((point) => {
             let closestIdx = 0;
             let minDiff = Infinity;
-            for (let idx = 0; idx < tideHourly48h.length; idx++) {
-                const diff = Math.abs(tideHourly48h[idx].time.getTime() - point.time.getTime());
+            for (let idx = 0; idx < tideCurve48h.length; idx++) {
+                const diff = Math.abs(tideCurve48h[idx].time.getTime() - point.time.getTime());
                 if (diff < minDiff) {
                     minDiff = diff;
                     closestIdx = idx;
                 }
             }
 
-            // Only mark events within 90 minutes of an hourly point.
-            if (minDiff > 90 * 60 * 1000) return;
+            // Only mark events within 30 minutes of an interpolated curve point.
+            if (minDiff > 30 * 60 * 1000) return;
 
             if (point.type === 'H') {
                 tideHighMarkers[closestIdx] = point.value;
@@ -3362,21 +3408,21 @@ function openDailyModal(data) {
 
     const nowMs = Date.now();
     const end14dMs = nowMs + (14 * 24 * 60 * 60 * 1000);
-    const dailyTideHourly14d = currentTideData?.hourlyPredictions
-        ? currentTideData.hourlyPredictions.filter((point) => {
+    const dailyTideCurve14d = currentTideData?.interpolatedPredictions
+        ? currentTideData.interpolatedPredictions.filter((point) => {
             const pointTimeMs = point.time.getTime();
             return pointTimeMs >= nowMs && pointTimeMs <= end14dMs;
         })
         : [];
 
-    const hasDailyTideData = dailyTideHourly14d.length >= 2;
+    const hasDailyTideData = dailyTideCurve14d.length >= 2;
     const dailyTideChartCanvas = document.getElementById('dailyTidesChart');
     if (dailyTideChartCanvas) {
         dailyTideChartCanvas.height = 220;
     }
 
     if (hasDailyTideData) {
-        dailyTideHourly14d.forEach((point) => {
+        dailyTideCurve14d.forEach((point) => {
             dailyTideLabels.push(point.time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
             dailyTideValues.push(point.value);
             dailyTideHighMarkers.push(null);
@@ -3393,15 +3439,15 @@ function openDailyModal(data) {
         hilo14d.forEach((point) => {
             let closestIdx = 0;
             let minDiff = Infinity;
-            for (let idx = 0; idx < dailyTideHourly14d.length; idx++) {
-                const diff = Math.abs(dailyTideHourly14d[idx].time.getTime() - point.time.getTime());
+            for (let idx = 0; idx < dailyTideCurve14d.length; idx++) {
+                const diff = Math.abs(dailyTideCurve14d[idx].time.getTime() - point.time.getTime());
                 if (diff < minDiff) {
                     minDiff = diff;
                     closestIdx = idx;
                 }
             }
 
-            if (minDiff > 90 * 60 * 1000) return;
+            if (minDiff > 30 * 60 * 1000) return;
 
             if (point.type === 'H') {
                 dailyTideHighMarkers[closestIdx] = point.value;
@@ -3703,7 +3749,7 @@ function openDailyModal(data) {
                             title: (items) => {
                                 if (!items || items.length === 0) return '';
                                 const idx = items[0].dataIndex;
-                                return dailyTideHourly14d[idx]?.time?.toLocaleString('en-US', {
+                                return dailyTideCurve14d[idx]?.time?.toLocaleString('en-US', {
                                     weekday: 'short',
                                     month: 'short',
                                     day: 'numeric',
