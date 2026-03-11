@@ -252,6 +252,24 @@
             border-color: rgba(107, 114, 128, 0.6);
         }
 
+        .search-autocomplete {
+            animation: autocompleteFade 0.15s ease-out;
+        }
+
+        .search-autocomplete-item {
+            min-height: 44px;
+        }
+
+        @keyframes autocompleteFade {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
         /* MathJax formula containers */
         .formula-container {
@@ -292,12 +310,16 @@
         <!-- Search Bar -->
         <div class="mb-6 px-2">
             <div class="flex flex-wrap gap-2 max-w-2xl mx-auto">
-                <input 
-                    type="text" 
-                    id="locationInput" 
-                    placeholder="Search for a city or location..."
-                    class="search-input flex-1 min-w-[200px] px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none"
-                >
+                <div class="relative flex-1 min-w-[200px]">
+                    <input 
+                        type="text" 
+                        id="locationInput" 
+                        placeholder="Search for a city or location..."
+                        autocomplete="off"
+                        class="search-input w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none"
+                    >
+                    <div id="searchAutocomplete" class="search-autocomplete hidden absolute top-full left-0 right-0 mt-2 rounded-xl border border-white/10 bg-gray-800/95 backdrop-blur-sm shadow-2xl z-[120] max-h-[300px] overflow-y-auto"></div>
+                </div>
                 <div class="flex gap-2">
                     <button 
                         id="searchBtn"
