@@ -10,7 +10,7 @@ let currentTideData = null;
 
 const NOAA_STATIONS_URL = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions';
 const NOAA_DATAGETTER_URL = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
-const NOAA_STATIONS_CACHE_KEY = 'noaa_tide_stations_cache_v1';
+const NOAA_STATIONS_CACHE_KEY = 'noaa_tide_stations_cache_v2';
 const NOAA_STATIONS_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const NOAA_PREDICTIONS_CACHE_MS = 24 * 60 * 60 * 1000;
 const NOAA_MAX_STATION_DISTANCE_KM = 15;
@@ -126,10 +126,30 @@ function haversineKm(lat1, lon1, lat2, lon2) {
     return earthRadiusKm * c;
 }
 
+function normalizeNoaaStations(rawStations) {
+    if (!Array.isArray(rawStations)) return [];
+
+    return rawStations
+        .map((station) => {
+            const lat = Number(station?.lat);
+            const lon = Number(station?.lon ?? station?.lng ?? station?.long);
+            return {
+                id: station?.id,
+                name: station?.name || station?.id,
+                lat,
+                lon
+            };
+        })
+        .filter((station) => station.id && Number.isFinite(station.lat) && Number.isFinite(station.lon));
+}
+
 async function fetchNoaaStations() {
     const cached = getCachedJson(NOAA_STATIONS_CACHE_KEY, NOAA_STATIONS_CACHE_MS);
     if (cached && Array.isArray(cached) && cached.length > 0) {
-        return cached;
+        const normalizedCached = normalizeNoaaStations(cached);
+        if (normalizedCached.length > 0) {
+            return normalizedCached;
+        }
     }
 
     const response = await fetch(NOAA_STATIONS_URL);
@@ -139,18 +159,7 @@ async function fetchNoaaStations() {
 
     const payload = await response.json();
     const rawStations = Array.isArray(payload?.stations) ? payload.stations : [];
-    const stations = rawStations
-        .map((station) => {
-            const lat = Number(station.lat);
-            const lon = Number(station.lng ?? station.lon);
-            return {
-                id: station.id,
-                name: station.name || station.id,
-                lat,
-                lon
-            };
-        })
-        .filter((station) => station.id && Number.isFinite(station.lat) && Number.isFinite(station.lon));
+    const stations = normalizeNoaaStations(rawStations);
 
     if (stations.length > 0) {
         setCachedJson(NOAA_STATIONS_CACHE_KEY, stations);
