@@ -13,9 +13,7 @@ const NOAA_DATAGETTER_URL = 'https://api.tidesandcurrents.noaa.gov/api/prod/data
 const NOAA_STATIONS_CACHE_KEY = 'noaa_tide_stations_cache_v1';
 const NOAA_STATIONS_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const NOAA_PREDICTIONS_CACHE_MS = 24 * 60 * 60 * 1000;
-const NOAA_STATION_DETAILS_CACHE_MS = 30 * 24 * 60 * 60 * 1000;
-const NOAA_MAX_STATION_DISTANCE_KM = 50;
-const NOAA_INLAND_WATERWAY_PATTERN = /\b(river|creek|canal|lake|tributary|brook|fork|branch|slough)\b/i;
+const NOAA_MAX_STATION_DISTANCE_KM = 15;
 
 const US_BOUNDS = {
     minLat: 24,
@@ -160,32 +158,6 @@ async function fetchNoaaStations() {
     return stations;
 }
 
-async function fetchNoaaStationDetails(stationId) {
-    if (!stationId) return null;
-
-    const cacheKey = `noaa_tide_station_details_v1_${stationId}`;
-    const cached = getCachedJson(cacheKey, NOAA_STATION_DETAILS_CACHE_MS);
-    if (cached) return cached;
-
-    try {
-        const response = await fetch(`https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${stationId}.json`);
-        if (!response.ok) return null;
-        const payload = await response.json();
-        const station = Array.isArray(payload?.stations) ? payload.stations[0] : null;
-        if (!station) return null;
-
-        const details = {
-            id: station.id,
-            fullName: station.name || '',
-            isInlandWaterway: NOAA_INLAND_WATERWAY_PATTERN.test(station.name || '')
-        };
-        setCachedJson(cacheKey, details);
-        return details;
-    } catch (error) {
-        return null;
-    }
-}
-
 async function findNearestNoaaStation(lat, lon, stations) {
     if (!Array.isArray(stations) || stations.length === 0) return null;
 
@@ -194,30 +166,20 @@ async function findNearestNoaaStation(lat, lon, stations) {
         .sort((a, b) => a.distanceKm - b.distanceKm);
 
     const nearestCandidate = sortedStations[0];
-    if (nearestCandidate) {
-        console.debug(`[Tides] Nearest NOAA station candidate: ${nearestCandidate.name} (${nearestCandidate.id}) at ${nearestCandidate.distanceKm.toFixed(1)} km`);
+    if (!nearestCandidate) return null;
+
+    console.debug(`[Tides] Nearest NOAA station candidate: ${nearestCandidate.name} (${nearestCandidate.id}) at ${nearestCandidate.distanceKm.toFixed(1)} km`);
+
+    if (nearestCandidate.distanceKm > NOAA_MAX_STATION_DISTANCE_KM) {
+        console.debug(`[Tides] No eligible coastal NOAA station within ${NOAA_MAX_STATION_DISTANCE_KM} km`);
+        return null;
     }
 
-    for (const station of sortedStations) {
-        if (station.distanceKm > NOAA_MAX_STATION_DISTANCE_KM) {
-            break;
-        }
-
-        const stationDetails = await fetchNoaaStationDetails(station.id);
-        if (stationDetails?.isInlandWaterway) {
-            console.debug(`[Tides] Skipping inland station ${stationDetails.fullName || station.name} (${station.id}) at ${station.distanceKm.toFixed(1)} km`);
-            continue;
-        }
-
-        console.debug(`[Tides] Using station ${station.name} (${station.id}) at ${station.distanceKm.toFixed(1)} km`);
-        return {
-            ...station,
-            distanceMi: station.distanceKm * 0.621371
-        };
-    }
-
-    console.debug(`[Tides] No eligible coastal NOAA station within ${NOAA_MAX_STATION_DISTANCE_KM} km`);
-    return null;
+    console.debug(`[Tides] Using station ${nearestCandidate.name} (${nearestCandidate.id}) at ${nearestCandidate.distanceKm.toFixed(1)} km`);
+    return {
+        ...nearestCandidate,
+        distanceMi: nearestCandidate.distanceKm * 0.621371
+    };
 }
 
 async function fetchNoaaPredictions(stationId, interval, beginDate, endDate) {
@@ -357,6 +319,28 @@ function computeTideYAxisBounds(values) {
     return { min, max };
 }
 
+function clearTideChartCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function clearTideUiState() {
+    if (hourlyChart?.tides) {
+        hourlyChart.tides.destroy();
+        hourlyChart.tides = null;
+    }
+    if (dailyChart?.tides) {
+        dailyChart.tides.destroy();
+        dailyChart.tides = null;
+    }
+
+    clearTideChartCanvas('hourlyTidesChart');
+    clearTideChartCanvas('dailyTidesChart');
+}
+
 function setHourlyTidesVisibility(tideData) {
     const option = document.getElementById('hourlyTidesOption');
     const chartContainer = document.getElementById('hourlyTidesChartContainer');
@@ -376,6 +360,7 @@ function setHourlyTidesVisibility(tideData) {
         chartContainer.dataset.featureHidden = 'false';
         subtitle.textContent = `${tideData.station.name} - ${tideData.station.distanceMi.toFixed(1)} mi away`;
     } else {
+        clearTideUiState();
         option.classList.add('hidden');
         chartContainer.dataset.featureHidden = 'true';
         chartContainer.style.display = 'none';
@@ -402,6 +387,7 @@ function setDailyTidesVisibility(tideData) {
         chartContainer.dataset.featureHidden = 'false';
         subtitle.textContent = `${tideData.station.name} - 14-day tidal curve`;
     } else {
+        clearTideUiState();
         option.classList.add('hidden');
         chartContainer.dataset.featureHidden = 'true';
         chartContainer.style.display = 'none';
@@ -3193,6 +3179,10 @@ function openDailyModal(data) {
         : [];
 
     const hasDailyTideData = dailyTideHourly14d.length >= 2;
+    const dailyTideChartCanvas = document.getElementById('dailyTidesChart');
+    if (dailyTideChartCanvas) {
+        dailyTideChartCanvas.height = 220;
+    }
 
     if (hasDailyTideData) {
         dailyTideHourly14d.forEach((point) => {
@@ -3467,7 +3457,7 @@ function openDailyModal(data) {
                 }]
             }
         }),
-        tides: (hasDailyTideData && document.getElementById('dailyTidesChart')) ? new Chart(document.getElementById('dailyTidesChart'), {
+        tides: (hasDailyTideData && dailyTideChartCanvas) ? new Chart(dailyTideChartCanvas, {
             type: 'line',
             data: {
                 labels: dailyTideLabels,
@@ -3508,7 +3498,8 @@ function openDailyModal(data) {
                     duration: 0
                 },
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: 2.2,
                 plugins: {
                     legend: {
                         labels: { color: '#fff' }
