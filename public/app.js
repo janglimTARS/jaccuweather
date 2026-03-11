@@ -6,6 +6,11 @@ let favorites = []; // Array of favorite locations
 let hourlyChart = null;
 let dailyChart = null;
 let currentTideData = null;
+let searchDebounceTimer = null;
+let searchSuggestions = [];
+let selectedSuggestionIndex = -1;
+let blurHideTimer = null;
+let activeSuggestionRequestId = 0;
 // Layer switching removed - Ventusky handles layers internally
 
 const NOAA_STATIONS_URL = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions';
@@ -914,10 +919,15 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // Search functionality
+const locationInputEl = document.getElementById('locationInput');
+const searchAutocompleteEl = document.getElementById('searchAutocomplete');
+
 document.getElementById('searchBtn').addEventListener('click', handleSearch);
-document.getElementById('locationInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleSearch();
-});
+locationInputEl.addEventListener('input', onSearchInput);
+locationInputEl.addEventListener('keydown', onSearchInputKeydown);
+locationInputEl.addEventListener('focus', onSearchInputFocus);
+locationInputEl.addEventListener('blur', onSearchInputBlur);
+document.addEventListener('click', onDocumentClickForAutocomplete);
 document.getElementById('locationBtn').addEventListener('click', () => {
     const btn = document.getElementById('locationBtn');
 
@@ -986,6 +996,201 @@ function showLocationBtnError(btn, msg) {
     setTimeout(() => tooltip.remove(), 4000);
 }
 
+function onSearchInput(e) {
+    const query = e.target.value.trim();
+    clearTimeout(searchDebounceTimer);
+
+    if (query.length < 2) {
+        hideAutocomplete();
+        return;
+    }
+
+    searchDebounceTimer = setTimeout(() => {
+        fetchSuggestions(query);
+    }, 300);
+}
+
+function onSearchInputFocus() {
+    if (blurHideTimer) clearTimeout(blurHideTimer);
+    if (searchSuggestions.length > 0 && locationInputEl.value.trim().length >= 2) {
+        showAutocomplete();
+    }
+}
+
+function onSearchInputBlur() {
+    blurHideTimer = setTimeout(() => {
+        hideAutocomplete();
+    }, 150);
+}
+
+function onDocumentClickForAutocomplete(e) {
+    if (!searchAutocompleteEl || !locationInputEl) return;
+    if (searchAutocompleteEl.contains(e.target) || locationInputEl.contains(e.target)) return;
+    hideAutocomplete();
+}
+
+function onSearchInputKeydown(e) {
+    const hasSuggestions = searchSuggestions.length > 0 && !searchAutocompleteEl.classList.contains('hidden');
+
+    if (e.key === 'Escape') {
+        hideAutocomplete();
+        return;
+    }
+
+    if (e.key === 'ArrowDown' && hasSuggestions) {
+        e.preventDefault();
+        selectedSuggestionIndex = (selectedSuggestionIndex + 1) % searchSuggestions.length;
+        renderSuggestions(searchSuggestions);
+        return;
+    }
+
+    if (e.key === 'ArrowUp' && hasSuggestions) {
+        e.preventDefault();
+        selectedSuggestionIndex = selectedSuggestionIndex <= 0 ? searchSuggestions.length - 1 : selectedSuggestionIndex - 1;
+        renderSuggestions(searchSuggestions);
+        return;
+    }
+
+    if (e.key === 'Enter') {
+        if (hasSuggestions && selectedSuggestionIndex >= 0) {
+            e.preventDefault();
+            selectSuggestion(searchSuggestions[selectedSuggestionIndex]);
+            return;
+        }
+        hideAutocomplete();
+        handleSearch();
+    }
+}
+
+function showAutocompleteLoading() {
+    if (!searchAutocompleteEl) return;
+    selectedSuggestionIndex = -1;
+    searchAutocompleteEl.innerHTML = `
+        <div class="px-4 py-3 text-sm text-white/70 flex items-center gap-2 min-h-[44px]">
+            <i class="fas fa-spinner fa-spin text-xs"></i>
+            <span>Searching...</span>
+        </div>
+    `;
+    showAutocomplete();
+}
+
+function showAutocomplete() {
+    if (!searchAutocompleteEl) return;
+    searchAutocompleteEl.classList.remove('hidden');
+}
+
+function hideAutocomplete() {
+    if (!searchAutocompleteEl) return;
+    clearTimeout(searchDebounceTimer);
+    selectedSuggestionIndex = -1;
+    searchAutocompleteEl.classList.add('hidden');
+}
+
+async function fetchSuggestions(query) {
+    const requestId = ++activeSuggestionRequestId;
+    showAutocompleteLoading();
+
+    try {
+        const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=8&language=en&format=json`);
+        const data = await response.json();
+
+        if (requestId !== activeSuggestionRequestId) return;
+
+        searchSuggestions = data.results || [];
+        selectedSuggestionIndex = searchSuggestions.length ? 0 : -1;
+        renderSuggestions(searchSuggestions);
+    } catch (error) {
+        if (requestId !== activeSuggestionRequestId) return;
+        hideAutocomplete();
+        searchSuggestions = [];
+        selectedSuggestionIndex = -1;
+        console.error('Autocomplete fetch failed:', error);
+    }
+}
+
+function formatSuggestionSubtitle(result) {
+    return [result.admin1, result.country].filter(Boolean).join(', ');
+}
+
+function formatDisplayLocationName(result) {
+    const name = result.name || result.admin1 || result.admin2 || '';
+    const resultCountry = result.country || '';
+    const admin1 = result.admin1 || '';
+    const isUS = resultCountry && (
+        resultCountry.includes('United States') ||
+        resultCountry === 'US' ||
+        resultCountry === 'USA'
+    );
+
+    if (name && resultCountry) {
+        if (isUS && admin1) return `${name}, ${admin1}`;
+        if (!isUS) return `${name}, ${resultCountry}`;
+        return name;
+    }
+
+    if (name) return name;
+    if (admin1) return admin1;
+    return null;
+}
+
+function renderSuggestions(results) {
+    if (!searchAutocompleteEl) return;
+
+    if (!results.length) {
+        searchAutocompleteEl.innerHTML = '<div class="px-4 py-3 text-sm text-white/60 min-h-[44px]">No matches found</div>';
+        showAutocomplete();
+        return;
+    }
+
+    searchAutocompleteEl.innerHTML = results.map((result, index) => {
+        const subtitle = formatSuggestionSubtitle(result);
+        const highlightedClass = index === selectedSuggestionIndex ? 'bg-white/20' : 'hover:bg-white/10';
+        const cityName = result.name || 'Unknown location';
+
+        return `
+            <button
+                type="button"
+                class="search-autocomplete-item w-full text-left px-4 py-2.5 border-b border-white/5 last:border-b-0 transition-colors ${highlightedClass}"
+                data-suggestion-index="${index}"
+            >
+                <div class="text-white font-semibold leading-tight">${cityName}</div>
+                <div class="text-white/50 text-xs mt-1 leading-tight">${subtitle || 'Location'}</div>
+            </button>
+        `;
+    }).join('');
+
+    searchAutocompleteEl.querySelectorAll('[data-suggestion-index]').forEach((item) => {
+        item.addEventListener('mousedown', (e) => e.preventDefault());
+        item.addEventListener('click', () => {
+            const idx = Number(item.dataset.suggestionIndex);
+            if (!Number.isNaN(idx) && searchSuggestions[idx]) {
+                selectSuggestion(searchSuggestions[idx]);
+            }
+        });
+    });
+
+    showAutocomplete();
+
+    const highlightedItem = searchAutocompleteEl.querySelector(`[data-suggestion-index="${selectedSuggestionIndex}"]`);
+    if (highlightedItem) {
+        highlightedItem.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function selectSuggestion(result) {
+    if (!result) return;
+
+    const displayValue = [result.name, result.admin1, result.country].filter(Boolean).join(', ');
+    locationInputEl.value = displayValue || result.name || '';
+    currentLat = result.latitude;
+    currentLon = result.longitude;
+    currentLocationName = formatDisplayLocationName(result);
+
+    hideAutocomplete();
+    locationInputEl.blur();
+    fetchWeather(currentLat, currentLon);
+}
+
 // State abbreviation to full name mapping (US states)
 const STATE_ABBREVIATIONS = {
     'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
@@ -1035,6 +1240,7 @@ function matchesState(result, searchState) {
 async function handleSearch() {
     const query = document.getElementById('locationInput').value.trim();
     if (!query) return;
+    hideAutocomplete();
 
     try {
         // Parse "City, State" or "City, State, Country" format
@@ -1070,37 +1276,7 @@ async function handleSearch() {
             
             currentLat = result.latitude;
             currentLon = result.longitude;
-            
-            // Store the location name for display - try multiple fields
-            const name = result.name || result.admin1 || result.admin2 || '';
-            const resultCountry = result.country || '';
-            const admin1 = result.admin1 || '';
-            
-            // Check if it's US (handle various formats)
-            const isUS = resultCountry && (
-                resultCountry.includes('United States') || 
-                resultCountry === 'US' || 
-                resultCountry === 'USA'
-            );
-            
-            if (name && resultCountry) {
-                // For US locations, prefer "City, State" format
-                if (isUS && admin1) {
-                    currentLocationName = `${name}, ${admin1}`;
-                } else if (!isUS) {
-                    // For non-US locations, show "City, Country"
-                    currentLocationName = `${name}, ${resultCountry}`;
-                } else {
-                    currentLocationName = name;
-                }
-            } else if (name) {
-                currentLocationName = name;
-            } else if (admin1) {
-                currentLocationName = admin1;
-            } else {
-                currentLocationName = null; // Will trigger reverse geocoding
-            }
-            
+            currentLocationName = formatDisplayLocationName(result);
             fetchWeather(currentLat, currentLon);
         } else {
             showError('Location not found. Please try another search.');
