@@ -289,6 +289,32 @@ function formatTideSummary(summary) {
     return `High: ${summary.high.value.toFixed(1)}ft @ ${formatTime12Hour(summary.high.time)} / Low: ${summary.low.value.toFixed(1)}ft @ ${formatTime12Hour(summary.low.time)}`;
 }
 
+function computeTideYAxisBounds(values) {
+    if (!Array.isArray(values) || values.length === 0) {
+        return { min: -1, max: 1 };
+    }
+
+    const numericValues = values.filter((value) => Number.isFinite(value));
+    if (numericValues.length === 0) {
+        return { min: -1, max: 1 };
+    }
+
+    const rawMin = Math.min(...numericValues);
+    const rawMax = Math.max(...numericValues);
+    const padding = 0.5;
+
+    let min = Math.floor((rawMin - padding) * 2) / 2;
+    let max = Math.ceil((rawMax + padding) * 2) / 2;
+
+    // Avoid zero-height axis when values are flat.
+    if (min === max) {
+        min -= 0.5;
+        max += 0.5;
+    }
+
+    return { min, max };
+}
+
 function setHourlyTidesVisibility(tideData) {
     const option = document.getElementById('hourlyTidesOption');
     const chartContainer = document.getElementById('hourlyTidesChartContainer');
@@ -307,6 +333,32 @@ function setHourlyTidesVisibility(tideData) {
         option.classList.remove('hidden');
         chartContainer.dataset.featureHidden = 'false';
         subtitle.textContent = `${tideData.station.name} - ${tideData.station.distanceMi.toFixed(1)} mi away`;
+    } else {
+        option.classList.add('hidden');
+        chartContainer.dataset.featureHidden = 'true';
+        chartContainer.style.display = 'none';
+        subtitle.textContent = '';
+    }
+}
+
+function setDailyTidesVisibility(tideData) {
+    const option = document.getElementById('dailyTidesOption');
+    const chartContainer = document.getElementById('dailyTidesChartContainer');
+    const subtitle = document.getElementById('dailyTidesSubtitle');
+    if (!option || !chartContainer || !subtitle) return;
+
+    const hasTideData = Boolean(
+        tideData?.station &&
+        Array.isArray(tideData.hourlyPredictions) &&
+        tideData.hourlyPredictions.length > 1 &&
+        Array.isArray(tideData.hiloPredictions) &&
+        tideData.hiloPredictions.length > 1
+    );
+
+    if (hasTideData) {
+        option.classList.remove('hidden');
+        chartContainer.dataset.featureHidden = 'false';
+        subtitle.textContent = `${tideData.station.name} - 14-day tidal curve`;
     } else {
         option.classList.add('hidden');
         chartContainer.dataset.featureHidden = 'true';
@@ -918,6 +970,7 @@ async function fetchWeather(lat, lon) {
 
 function displayWeather(data) {
     setHourlyTidesVisibility(currentTideData);
+    setDailyTidesVisibility(currentTideData);
 
     // Use stored location name if available (from search or reverse geocoding)
     let location = currentLocationName;
@@ -2603,10 +2656,12 @@ function openHourlyModal(data) {
     let tideHighMarkers = [];
     let tideLowMarkers = [];
     let tideMarkerLabels = [];
+    let tideYAxisBounds = { min: -1, max: 1 };
 
     if (hasTideData) {
         tideLabels = tideHourly48h.map((point) => formatTime12Hour(point.time));
         tideValues = tideHourly48h.map((point) => point.value);
+        tideYAxisBounds = computeTideYAxisBounds(tideValues);
         tideHighMarkers = new Array(tideHourly48h.length).fill(null);
         tideLowMarkers = new Array(tideHourly48h.length).fill(null);
 
@@ -2868,6 +2923,9 @@ function openHourlyModal(data) {
                 ]
             },
             options: {
+                animation: {
+                    duration: 0
+                },
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
@@ -2886,6 +2944,9 @@ function openHourlyModal(data) {
                         grid: { color: 'rgba(255,255,255,0.1)' }
                     },
                     y: {
+                        beginAtZero: false,
+                        min: tideYAxisBounds.min,
+                        max: tideYAxisBounds.max,
                         ticks: {
                             color: '#fff',
                             callback: (value) => `${value} ft`
@@ -2949,6 +3010,7 @@ function openHourlyModal(data) {
 function openDailyModal(data) {
     const modal = document.getElementById('dailyModal');
     modal.classList.add('active');
+    setDailyTidesVisibility(currentTideData);
 
     // Hide all chart containers during modal animation so Chart.js doesn't
     // fire resize events while the slide-in is running (causes Y-axis expansion)
@@ -2977,6 +3039,12 @@ function openDailyModal(data) {
     const dailyCloudMid = [];
     const dailyCloudHigh = [];
     const dailyShortwaveAverage = [];
+    const dailyTideLabels = [];
+    const dailyTideValues = [];
+    const dailyTideHighMarkers = [];
+    const dailyTideLowMarkers = [];
+    const dailyTideMarkerLabels = [];
+    let dailyTideYAxisBounds = { min: -1, max: 1 };
     const apparentUnit = data.daily_units.apparent_temperature_max || data.daily_units.temperature_2m_max;
     
     // Start from index 2 to skip past 2 days due to past_days=2
@@ -3065,8 +3133,79 @@ function openDailyModal(data) {
         }
     }
 
+    const nowMs = Date.now();
+    const end14dMs = nowMs + (14 * 24 * 60 * 60 * 1000);
+    const dailyTideHourly14d = currentTideData?.hourlyPredictions
+        ? currentTideData.hourlyPredictions.filter((point) => {
+            const pointTimeMs = point.time.getTime();
+            return pointTimeMs >= nowMs && pointTimeMs <= end14dMs;
+        })
+        : [];
+
+    const hasDailyTideData = dailyTideHourly14d.length >= 2;
+
+    if (hasDailyTideData) {
+        dailyTideHourly14d.forEach((point) => {
+            dailyTideLabels.push(point.time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            dailyTideValues.push(point.value);
+            dailyTideHighMarkers.push(null);
+            dailyTideLowMarkers.push(null);
+        });
+
+        dailyTideYAxisBounds = computeTideYAxisBounds(dailyTideValues);
+
+        const hilo14d = currentTideData.hiloPredictions.filter((point) => {
+            const pointTimeMs = point.time.getTime();
+            return pointTimeMs >= nowMs && pointTimeMs <= end14dMs;
+        });
+
+        hilo14d.forEach((point) => {
+            let closestIdx = 0;
+            let minDiff = Infinity;
+            for (let idx = 0; idx < dailyTideHourly14d.length; idx++) {
+                const diff = Math.abs(dailyTideHourly14d[idx].time.getTime() - point.time.getTime());
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIdx = idx;
+                }
+            }
+
+            if (minDiff > 90 * 60 * 1000) return;
+
+            if (point.type === 'H') {
+                dailyTideHighMarkers[closestIdx] = point.value;
+                dailyTideMarkerLabels.push({ index: closestIdx, value: point.value, text: 'H' });
+            } else if (point.type === 'L') {
+                dailyTideLowMarkers[closestIdx] = point.value;
+                dailyTideMarkerLabels.push({ index: closestIdx, value: point.value, text: 'L' });
+            }
+        });
+    }
+
     const maxDailyShortwave = Math.max(...dailyShortwaveAverage.filter(v => v !== null && v !== undefined && v > 0), 1);
     const dailyBrightnessData = dailyShortwaveAverage.map(v => v === null || v === undefined ? 0 : Math.round((v / maxDailyShortwave) * 100));
+
+    const dailyTideMarkerLabelPlugin = {
+        id: 'dailyTideMarkerLabelPlugin',
+        afterDatasetsDraw(chart) {
+            if (!chart?.$tideMarkerLabels || chart.$tideMarkerLabels.length === 0) return;
+            const { ctx, scales } = chart;
+            const xScale = scales.x;
+            const yScale = scales.y;
+            ctx.save();
+            ctx.fillStyle = '#67e8f9';
+            ctx.font = '600 10px Inter, sans-serif';
+            ctx.textAlign = 'center';
+
+            chart.$tideMarkerLabels.forEach((point) => {
+                const x = xScale.getPixelForValue(point.index);
+                const y = yScale.getPixelForValue(point.value);
+                ctx.fillText(point.text, x, y - 10);
+            });
+
+            ctx.restore();
+        }
+    };
     
     // Create charts
     const chartConfig = {
@@ -3278,6 +3417,92 @@ function openDailyModal(data) {
                 }]
             }
         }),
+        tides: (hasDailyTideData && document.getElementById('dailyTidesChart')) ? new Chart(document.getElementById('dailyTidesChart'), {
+            type: 'line',
+            data: {
+                labels: dailyTideLabels,
+                datasets: [
+                    {
+                        label: 'Tide Height (ft, MLLW)',
+                        data: dailyTideValues,
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                        tension: 0.45,
+                        fill: true,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'High Tide',
+                        data: dailyTideHighMarkers,
+                        borderColor: '#67e8f9',
+                        backgroundColor: '#67e8f9',
+                        pointRadius: 3,
+                        pointHoverRadius: 4,
+                        pointStyle: 'circle',
+                        showLine: false
+                    },
+                    {
+                        label: 'Low Tide',
+                        data: dailyTideLowMarkers,
+                        borderColor: '#22d3ee',
+                        backgroundColor: '#22d3ee',
+                        pointRadius: 3,
+                        pointHoverRadius: 4,
+                        pointStyle: 'rectRot',
+                        showLine: false
+                    }
+                ]
+            },
+            options: {
+                animation: {
+                    duration: 0
+                },
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => {
+                                if (!items || items.length === 0) return '';
+                                const idx = items[0].dataIndex;
+                                return dailyTideHourly14d[idx]?.time?.toLocaleString('en-US', {
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit'
+                                }) || items[0].label;
+                            },
+                            label: (context) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} ft`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#fff',
+                            autoSkip: true,
+                            maxTicksLimit: 14
+                        },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        min: dailyTideYAxisBounds.min,
+                        max: dailyTideYAxisBounds.max,
+                        ticks: {
+                            color: '#fff',
+                            callback: (value) => `${value} ft`
+                        },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                }
+            },
+            plugins: [dailyTideMarkerLabelPlugin]
+        }) : null,
         moonPhase: new Chart(document.getElementById('dailyMoonPhaseChart'), {
             ...chartConfig,
             data: {
@@ -3323,6 +3548,10 @@ function openDailyModal(data) {
             }
         })
     };
+
+    if (dailyChart.tides) {
+        dailyChart.tides.$tideMarkerLabels = dailyTideMarkerLabels;
+    }
     
     // Hide/show charts based on rain and snow presence
     const snowChartContainer = document.getElementById('dailySnowChart').parentElement;
