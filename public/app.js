@@ -13,6 +13,8 @@ let blurHideTimer = null;
 let activeSuggestionRequestId = 0;
 // Layer switching removed - Ventusky handles layers internally
 
+const HOURLY_FORECAST_HOURS = 48;
+
 const NOAA_STATIONS_URL = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions';
 const NOAA_DATAGETTER_URL = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
 const TIDE_CACHE_VERSION = 'v2';
@@ -1566,7 +1568,7 @@ function displayWeather(data) {
         }
     }
     
-    for (let i = 0; i < 24 && (startIndex + i) < data.hourly.time.length; i++) {
+    for (let i = 0; i < HOURLY_FORECAST_HOURS && (startIndex + i) < data.hourly.time.length; i++) {
         const hourIndex = startIndex + i;
         const hour = new Date(data.hourly.time[hourIndex]);
         const hourItem = document.createElement('div');
@@ -2128,13 +2130,13 @@ function displayPrecipitationTiming(data) {
         }
     }
     
-    // Look ahead 24 hours for precipitation
+    // Look ahead 48 hours for precipitation
     let precipStartTime = null;
     let precipEndTime = null;
     let isSnow = false;
     let precipAmount = 0;
     
-    for (let i = startIndex; i < Math.min(startIndex + 24, data.hourly.time.length); i++) {
+    for (let i = startIndex; i < Math.min(startIndex + HOURLY_FORECAST_HOURS, data.hourly.time.length); i++) {
         const precip = data.hourly.precipitation[i] || 0;
         const snow = data.hourly.snowfall ? (data.hourly.snowfall[i] || 0) : 0;
         
@@ -2154,7 +2156,7 @@ function displayPrecipitationTiming(data) {
     if (!precipStartTime) {
         // No precipitation expected
         icon.textContent = '☀️';
-        timingText.textContent = 'No precipitation expected in the next 24 hours';
+        timingText.textContent = `No precipitation expected in the next ${HOURLY_FORECAST_HOURS} hours`;
         section.classList.remove('hidden');
     } else {
         const startHour = precipStartTime.getHours();
@@ -3032,7 +3034,7 @@ function openHourlyModal(data) {
     const shortwaveData = [];
     const labels = [];
     
-    for (let i = 0; i < 24 && (startIndex + i) < data.hourly.time.length; i++) {
+    for (let i = 0; i < HOURLY_FORECAST_HOURS && (startIndex + i) < data.hourly.time.length; i++) {
         const idx = startIndex + i;
         const hour = new Date(data.hourly.time[idx]);
         labels.push(formatTime12Hour(hour));
