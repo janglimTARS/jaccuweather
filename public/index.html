@@ -219,6 +219,127 @@
             background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.055));
         }
 
+        .daily-forecast-card {
+            width: 100%;
+            min-height: 88px;
+        }
+
+        .daily-forecast-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+        }
+
+        .daily-forecast-date,
+        .daily-forecast-details {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .daily-forecast-date {
+            gap: 1rem;
+        }
+
+        .daily-forecast-details {
+            justify-content: flex-end;
+            gap: 1.5rem;
+        }
+
+        .daily-forecast-day,
+        .daily-forecast-date-label,
+        .daily-forecast-high,
+        .daily-forecast-low,
+        .daily-forecast-feels,
+        .daily-forecast-metrics div {
+            white-space: nowrap;
+        }
+
+        .daily-forecast-temps,
+        .daily-forecast-metrics {
+            flex: 0 0 auto;
+        }
+
+        .daily-forecast-metrics {
+            min-width: 100px;
+        }
+
+        .daily-forecast-tide {
+            overflow-wrap: normal;
+            word-break: normal;
+            hyphens: none;
+        }
+
+        .daily-forecast-tide span {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        @media (max-width: 640px) {
+            .daily-forecast-card {
+                padding: 0.875rem;
+            }
+
+            .daily-forecast-main {
+                grid-template-columns: minmax(6rem, 1fr) auto;
+                gap: 0.75rem;
+            }
+
+            .daily-forecast-date {
+                gap: 0.75rem;
+            }
+
+            .daily-forecast-details {
+                gap: 0.75rem;
+            }
+
+            .daily-forecast-icon {
+                flex: 0 0 2.25rem;
+                text-align: center;
+            }
+
+            .daily-forecast-day {
+                font-size: 1rem;
+                line-height: 1.25rem;
+            }
+
+            .daily-forecast-high {
+                font-size: 1.125rem;
+                line-height: 1.5rem;
+            }
+
+            .daily-forecast-feels {
+                font-size: 0.6875rem;
+                line-height: 1rem;
+            }
+
+            .daily-forecast-metrics {
+                min-width: 4.6rem;
+                font-size: 0.75rem;
+                line-height: 1.05rem;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .daily-forecast-main {
+                grid-template-columns: 1fr;
+                align-items: stretch;
+            }
+
+            .daily-forecast-details {
+                justify-content: space-between;
+                padding-left: 3rem;
+            }
+
+            .daily-forecast-metrics {
+                min-width: auto;
+            }
+        }
+
         .temp-display {
             font-variant-numeric: tabular-nums;
             text-shadow: 0 10px 34px rgba(56, 189, 248, 0.25);

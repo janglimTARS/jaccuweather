@@ -2056,37 +2056,35 @@ function displayWeather(data) {
         const apparentMin = hasApparentTemps ? Math.round(apparentMinRaw) : null;
         const apparentUnit = UNITS.temperature;
         const dayItem = document.createElement('div');
-        dayItem.className = 'flex items-center justify-between forecast-chip rounded-lg p-4 backdrop-blur-sm clickable';
+        dayItem.className = 'daily-forecast-card forecast-chip rounded-lg p-4 backdrop-blur-sm clickable';
         dayItem.innerHTML = `
-            <div class="w-full">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex items-center gap-4">
-                        <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
-                        <div>
-                            <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
-                            <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between sm:justify-end gap-4 sm:gap-6">
-                        <div class="text-right">
-                            <div class="text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[dayIndex])}${UNITS.temperature}</div>
-                            <div class="text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[dayIndex])}${UNITS.temperature}</div>
-                            ${hasApparentTemps ? `<div class="text-white/50 text-xs">Feels like ${apparentMax}${apparentUnit} / ${apparentMin}${apparentUnit}</div>` : ''}
-                        </div>
-                        <div class="text-white/70 text-sm text-right min-w-[100px]">
-                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[dayIndex] || 0} ${UNITS.precipitation}</div>`}
-                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[dayIndex]} ${UNITS.snowfall}</div>` : ''}
-                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '')}
-                            <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[dayIndex]} ${UNITS.wind}</div>
-                        </div>
+            <div class="daily-forecast-main">
+                <div class="daily-forecast-date">
+                    <div class="daily-forecast-icon text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
+                    <div class="min-w-0">
+                        <div class="daily-forecast-day text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
+                        <div class="daily-forecast-date-label text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                     </div>
                 </div>
-                ${tideSummaryText ? `
-                <div class="mt-3 pt-3 border-t border-cyan-400/20 text-cyan-100/90 text-xs md:text-sm">
-                    <i class="fas fa-water mr-2 text-cyan-300/90"></i>${tideSummaryText}
+                <div class="daily-forecast-details">
+                    <div class="daily-forecast-temps text-right">
+                        <div class="daily-forecast-high text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[dayIndex])}${UNITS.temperature}</div>
+                        <div class="daily-forecast-low text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[dayIndex])}${UNITS.temperature}</div>
+                        ${hasApparentTemps ? `<div class="daily-forecast-feels text-white/50 text-xs">Feels like ${apparentMax}${apparentUnit} / ${apparentMin}${apparentUnit}</div>` : ''}
+                    </div>
+                    <div class="daily-forecast-metrics text-white/70 text-sm text-right">
+                        ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[dayIndex] || 0} ${UNITS.precipitation}</div>`}
+                        ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[dayIndex]} ${UNITS.snowfall}</div>` : ''}
+                        ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '')}
+                        <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[dayIndex]} ${UNITS.wind}</div>
+                    </div>
                 </div>
-                ` : ''}
             </div>
+            ${tideSummaryText ? `
+            <div class="daily-forecast-tide mt-3 pt-3 border-t border-cyan-400/20 text-cyan-100/90 text-xs md:text-sm">
+                <i class="fas fa-water mr-2 text-cyan-300/90"></i><span>${tideSummaryText}</span>
+            </div>
+            ` : ''}
         `;
         
         dayItem.addEventListener('click', () => openDailyModal(data));
