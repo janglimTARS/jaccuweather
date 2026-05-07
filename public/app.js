@@ -232,9 +232,13 @@ function findEnsembleUnit(unitsContainer, variable, options = {}) {
     return unitKey ? unitsContainer[unitKey] : undefined;
 }
 
-function aggregateEnsembleSeries(seriesList, strategy = 'average') {
+function aggregateEnsembleSeries(seriesList, strategy = 'average', expectedLength = null) {
     if (!seriesList.length) return null;
-    const length = Math.max(...seriesList.map((series) => series.length));
+    // Use expectedLength (time array length) as the source of truth when provided,
+    // otherwise fall back to Math.max on series lengths
+    const length = expectedLength !== null && expectedLength !== undefined
+        ? expectedLength
+        : Math.max(...seriesList.map((series) => series.length));
     const result = new Array(length).fill(null);
 
     for (let i = 0; i < length; i++) {
@@ -276,7 +280,7 @@ function normalizeAggregatedSeries(series, options = {}) {
     });
 }
 
-function deriveEnsemblePrecipitationProbability(hourlyData, threshold = 0.01) {
+function deriveEnsemblePrecipitationProbability(hourlyData, threshold = 0.01, expectedLength = null) {
     if (!hourlyData) return null;
 
     const memberSeries = Object.keys(hourlyData)
@@ -290,7 +294,11 @@ function deriveEnsemblePrecipitationProbability(hourlyData, threshold = 0.01) {
 
     if (!memberSeries.length) return null;
 
-    const length = Math.max(...memberSeries.map((series) => series.length));
+    // Use expectedLength (time array length) as the source of truth when provided,
+    // otherwise fall back to Math.max on series lengths
+    const length = expectedLength !== null && expectedLength !== undefined
+        ? expectedLength
+        : Math.max(...memberSeries.map((series) => series.length));
     const probability = new Array(length).fill(null);
 
     for (let i = 0; i < length; i++) {
@@ -435,7 +443,7 @@ function normalizeEnsembleWeatherData(rawData, lat, lon) {
         const seriesList = findEnsembleSeries(rawData.hourly, config.source, {
             excludeMember: !!config.excludeMember
         });
-        const aggregated = aggregateEnsembleSeries(seriesList, config.strategy);
+        const aggregated = aggregateEnsembleSeries(seriesList, config.strategy, normalized.hourly.time.length);
         if (aggregated) {
             normalized.hourly[config.target] = normalizeAggregatedSeries(
                 aggregated,
@@ -448,7 +456,7 @@ function normalizeEnsembleWeatherData(rawData, lat, lon) {
         }
     }
 
-    const derivedPrecipitationProbability = deriveEnsemblePrecipitationProbability(rawData.hourly, 0.01);
+    const derivedPrecipitationProbability = deriveEnsemblePrecipitationProbability(rawData.hourly, 0.01, normalized.hourly.time.length);
     if (derivedPrecipitationProbability) {
         normalized.hourly.precipitation_probability = derivedPrecipitationProbability;
         normalized.hourly_units.precipitation_probability = '%';
@@ -483,7 +491,7 @@ function normalizeEnsembleWeatherData(rawData, lat, lon) {
         const seriesList = findEnsembleSeries(rawData.daily, config.source, {
             excludeMember: !!config.excludeMember
         });
-        const aggregated = aggregateEnsembleSeries(seriesList, config.strategy);
+        const aggregated = aggregateEnsembleSeries(seriesList, config.strategy, dailyTime.length);
         if (aggregated) {
             normalized.daily[config.target] = normalizeAggregatedSeries(
                 aggregated,
@@ -1866,6 +1874,11 @@ function displayWeather(data) {
     document.getElementById('lastUpdated').textContent = `Updated ${formatLastUpdated(new Date())}`;
     
     document.getElementById('currentTemp').textContent = `${Math.round(data.current.temperature_2m)}${data.current_units.temperature_2m}`;
+    const currentIconEl = document.getElementById('currentIcon');
+    if (currentIconEl) {
+        currentIconEl.textContent = getWeatherIcon(data.current.weather_code, data.current.is_day !== 0);
+        currentIconEl.setAttribute('aria-hidden', 'true');
+    }
 
     // Display today's high/low temperatures (index 2 because of past_days=2)
     if (data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[2] !== undefined) {
@@ -2011,7 +2024,7 @@ function displayWeather(data) {
         const hourIndex = startIndex + i;
         const hour = new Date(data.hourly.time[hourIndex]);
         const hourItem = document.createElement('div');
-        hourItem.className = 'flex flex-col items-center bg-white/10 rounded-lg p-3 backdrop-blur-sm min-w-[80px] clickable';
+        hourItem.className = 'flex flex-col items-center forecast-chip rounded-lg p-3 backdrop-blur-sm min-w-[80px] clickable';
         hourItem.innerHTML = `
             <div class="text-white/70 text-sm mb-1">${formatTime12Hour(hour)}</div>
             <div class="text-2xl mb-2">${getWeatherIcon(data.hourly.weather_code[hourIndex], data.hourly.is_day ? data.hourly.is_day[hourIndex] !== 0 : true)}</div>
@@ -2043,37 +2056,35 @@ function displayWeather(data) {
         const apparentMin = hasApparentTemps ? Math.round(apparentMinRaw) : null;
         const apparentUnit = UNITS.temperature;
         const dayItem = document.createElement('div');
-        dayItem.className = 'flex items-center justify-between bg-white/10 rounded-lg p-4 backdrop-blur-sm clickable';
+        dayItem.className = 'daily-forecast-card forecast-chip rounded-lg p-4 backdrop-blur-sm clickable';
         dayItem.innerHTML = `
-            <div class="w-full">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <div class="text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
-                        <div>
-                            <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
-                            <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-6">
-                        <div class="text-right">
-                            <div class="text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[dayIndex])}${UNITS.temperature}</div>
-                            <div class="text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[dayIndex])}${UNITS.temperature}</div>
-                            ${hasApparentTemps ? `<div class="text-white/50 text-xs">Feels like ${apparentMax}${apparentUnit} / ${apparentMin}${apparentUnit}</div>` : ''}
-                        </div>
-                        <div class="text-white/70 text-sm text-right min-w-[100px]">
-                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[dayIndex] || 0} ${UNITS.precipitation}</div>`}
-                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[dayIndex]} ${UNITS.snowfall}</div>` : ''}
-                            ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '')}
-                            <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[dayIndex]} ${UNITS.wind}</div>
-                        </div>
+            <div class="daily-forecast-main">
+                <div class="daily-forecast-date">
+                    <div class="daily-forecast-icon text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
+                    <div class="min-w-0">
+                        <div class="daily-forecast-day text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
+                        <div class="daily-forecast-date-label text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                     </div>
                 </div>
-                ${tideSummaryText ? `
-                <div class="mt-3 pt-3 border-t border-cyan-400/20 text-cyan-100/90 text-xs md:text-sm">
-                    <i class="fas fa-water mr-2 text-cyan-300/90"></i>${tideSummaryText}
+                <div class="daily-forecast-details">
+                    <div class="daily-forecast-temps text-right">
+                        <div class="daily-forecast-high text-white font-bold text-xl">${Math.round(data.daily.temperature_2m_max[dayIndex])}${UNITS.temperature}</div>
+                        <div class="daily-forecast-low text-white/70 text-sm">${Math.round(data.daily.temperature_2m_min[dayIndex])}${UNITS.temperature}</div>
+                        ${hasApparentTemps ? `<div class="daily-forecast-feels text-white/50 text-xs">Feels like ${apparentMax}${apparentUnit} / ${apparentMin}${apparentUnit}</div>` : ''}
+                    </div>
+                    <div class="daily-forecast-metrics text-white/70 text-sm text-right">
+                        ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? '' : `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_sum[dayIndex] || 0} ${UNITS.precipitation}</div>`}
+                        ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.snowfall_sum[dayIndex]} ${UNITS.snowfall}</div>` : ''}
+                        ${data.daily.snowfall_sum && data.daily.snowfall_sum[dayIndex] > 0 ? (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-snowflake mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '') : (data.daily.precipitation_probability_max && data.daily.precipitation_probability_max[dayIndex] !== null && data.daily.precipitation_probability_max[dayIndex] !== undefined ? `<div><i class="fas fa-tint mr-1"></i>${data.daily.precipitation_probability_max[dayIndex]}%</div>` : '')}
+                        <div><i class="fas fa-wind mr-1"></i>${data.daily.wind_speed_10m_max[dayIndex]} ${UNITS.wind}</div>
+                    </div>
                 </div>
-                ` : ''}
             </div>
+            ${tideSummaryText ? `
+            <div class="daily-forecast-tide mt-3 pt-3 border-t border-cyan-400/20 text-cyan-100/90 text-xs md:text-sm">
+                <i class="fas fa-water mr-2 text-cyan-300/90"></i><span>${tideSummaryText}</span>
+            </div>
+            ` : ''}
         `;
         
         dayItem.addEventListener('click', () => openDailyModal(data));
@@ -2174,7 +2185,7 @@ async function displayWeeklySnowTotals(data) {
     
     snowPeriods.forEach(period => {
         const periodItem = document.createElement('div');
-        periodItem.className = 'bg-white/10 rounded-lg p-4 backdrop-blur-sm';
+        periodItem.className = 'forecast-chip rounded-lg p-4 backdrop-blur-sm';
         
         // Round total to nearest 0.1
         const totalSnowRounded = Math.round(period.totalSnow * 10) / 10;
@@ -3869,7 +3880,7 @@ function openHourlyModal(data) {
         const idx = startIndex + i;
         const hour = hours[i];
         const detailItem = document.createElement('div');
-        detailItem.className = 'bg-white/10 rounded-lg p-4 backdrop-blur-sm';
+        detailItem.className = 'forecast-chip rounded-lg p-4 backdrop-blur-sm';
         detailItem.innerHTML = `
                 <div class="flex items-center justify-between mb-2">
                 <div class="text-white font-semibold">${hour.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} ${formatTime12Hour(hour)}</div>
@@ -4481,7 +4492,7 @@ function openDailyModal(data) {
         const moonPhaseValue = calculateMoonPhase(day);
         const moonPhase = getMoonPhase(moonPhaseValue);
         const detailItem = document.createElement('div');
-        detailItem.className = 'bg-white/10 rounded-lg p-4 backdrop-blur-sm';
+        detailItem.className = 'forecast-chip rounded-lg p-4 backdrop-blur-sm';
         detailItem.innerHTML = `
             <div class="flex items-center justify-between mb-3">
                 <div>

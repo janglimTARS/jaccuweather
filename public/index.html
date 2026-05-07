@@ -46,22 +46,61 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
+        :root {
+            --sky-ink: #07111f;
+            --sky-deep: #0d1b2e;
+            --sky-mid: #12385f;
+            --glass-border: rgba(148, 163, 184, 0.2);
+            --accent: #38bdf8;
+        }
+
         html {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background: radial-gradient(circle at 18% 12%, rgba(56, 189, 248, 0.22), transparent 30%),
+                        radial-gradient(circle at 82% 8%, rgba(250, 204, 21, 0.12), transparent 26%),
+                        linear-gradient(145deg, var(--sky-ink) 0%, var(--sky-deep) 48%, var(--sky-mid) 100%);
             background-attachment: fixed;
         }
         
         body {
             font-family: 'Inter', system-ui, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background: transparent;
             background-attachment: fixed;
             min-height: 100vh;
+            letter-spacing: -0.01em;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent 72%);
         }
         
         .card {
-            background: rgba(31, 41, 55, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(75, 85, 99, 0.5);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.56));
+            backdrop-filter: blur(18px) saturate(130%);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 18px 60px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+
+        .hero-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-card::after {
+            content: '';
+            position: absolute;
+            width: 340px;
+            height: 340px;
+            right: -120px;
+            top: -140px;
+            border-radius: 9999px;
+            background: radial-gradient(circle, rgba(56,189,248,0.28), transparent 68%);
+            pointer-events: none;
         }
         
         .skeleton {
@@ -155,23 +194,164 @@
         
         .clickable {
             cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
+            transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
         
         .clickable:hover {
-            transform: scale(1.02);
-            background: rgba(75, 85, 99, 0.6) !important;
+            transform: translateY(-2px) scale(1.01);
+            background: rgba(56, 189, 248, 0.12) !important;
+            box-shadow: 0 12px 30px rgba(8, 47, 73, 0.28);
         }
         
         .stat-card {
-            background: rgba(55, 65, 81, 0.5);
-            border: 1px solid rgba(75, 85, 99, 0.5);
+            background: rgba(15, 23, 42, 0.48);
+            border: 1px solid rgba(148, 163, 184, 0.16);
             transition: all 0.2s ease;
         }
         
         .stat-card:hover {
-            background: rgba(55, 65, 81, 0.7);
-            border-color: rgba(107, 114, 128, 0.6);
+            background: rgba(14, 116, 144, 0.18);
+            border-color: rgba(125, 211, 252, 0.36);
+        }
+
+        .forecast-chip {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.055));
+        }
+
+        .daily-forecast-card {
+            width: 100%;
+            min-height: 88px;
+        }
+
+        .daily-forecast-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+        }
+
+        .daily-forecast-date,
+        .daily-forecast-details {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .daily-forecast-date {
+            gap: 1rem;
+        }
+
+        .daily-forecast-details {
+            justify-content: flex-end;
+            gap: 1.5rem;
+        }
+
+        .daily-forecast-day,
+        .daily-forecast-date-label,
+        .daily-forecast-high,
+        .daily-forecast-low,
+        .daily-forecast-feels,
+        .daily-forecast-metrics div {
+            white-space: nowrap;
+        }
+
+        .daily-forecast-temps,
+        .daily-forecast-metrics {
+            flex: 0 0 auto;
+        }
+
+        .daily-forecast-metrics {
+            min-width: 100px;
+        }
+
+        .daily-forecast-tide {
+            overflow-wrap: normal;
+            word-break: normal;
+            hyphens: none;
+        }
+
+        .daily-forecast-tide span {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        @media (max-width: 640px) {
+            .daily-forecast-card {
+                padding: 0.875rem;
+            }
+
+            .daily-forecast-main {
+                grid-template-columns: minmax(6rem, 1fr) auto;
+                gap: 0.75rem;
+            }
+
+            .daily-forecast-date {
+                gap: 0.75rem;
+            }
+
+            .daily-forecast-details {
+                gap: 0.75rem;
+            }
+
+            .daily-forecast-icon {
+                flex: 0 0 2.25rem;
+                text-align: center;
+            }
+
+            .daily-forecast-day {
+                font-size: 1rem;
+                line-height: 1.25rem;
+            }
+
+            .daily-forecast-high {
+                font-size: 1.125rem;
+                line-height: 1.5rem;
+            }
+
+            .daily-forecast-feels {
+                font-size: 0.6875rem;
+                line-height: 1rem;
+            }
+
+            .daily-forecast-metrics {
+                min-width: 4.6rem;
+                font-size: 0.75rem;
+                line-height: 1.05rem;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .daily-forecast-main {
+                grid-template-columns: 1fr;
+                align-items: stretch;
+            }
+
+            .daily-forecast-details {
+                justify-content: space-between;
+                padding-left: 3rem;
+            }
+
+            .daily-forecast-metrics {
+                min-width: auto;
+            }
+        }
+
+        .temp-display {
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 10px 34px rgba(56, 189, 248, 0.25);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+            }
         }
         
         .ventusky-iframe-container {
@@ -230,26 +410,26 @@
         }
         
         .search-input {
-            background: rgba(55, 65, 81, 0.6);
-            border: 1px solid rgba(75, 85, 99, 0.5);
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.24);
             transition: all 0.2s ease;
         }
         
         .search-input:focus {
-            background: rgba(55, 65, 81, 0.8);
-            border-color: rgba(107, 114, 128, 0.7);
-            box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.2);
+            background: rgba(15, 23, 42, 0.92);
+            border-color: rgba(56, 189, 248, 0.75);
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.14);
         }
         
         .btn {
-            background: rgba(55, 65, 81, 0.6);
-            border: 1px solid rgba(75, 85, 99, 0.5);
+            background: rgba(15, 23, 42, 0.68);
+            border: 1px solid rgba(148, 163, 184, 0.2);
             transition: all 0.2s ease;
         }
         
         .btn:hover {
-            background: rgba(75, 85, 99, 0.7);
-            border-color: rgba(107, 114, 128, 0.6);
+            background: rgba(14, 116, 144, 0.28);
+            border-color: rgba(125, 211, 252, 0.45);
         }
 
         .search-autocomplete {
@@ -291,15 +471,15 @@
         }
     </style>
 </head>
-<body class="text-white p-4 md:p-8">
-    <div class="max-w-6xl mx-auto">
+<body class="text-white p-3 sm:p-4 md:p-8 selection:bg-sky-300/30 selection:text-white">
+    <div class="max-w-6xl mx-auto relative z-10">
         <!-- Header -->
         <header class="text-center mb-8">
             <h1 class="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3">
                 <span class="text-4xl">🌤️</span>
                 Jaccuweather
             </h1>
-            <p class="text-gray-400 text-sm">Powered by Open-Meteo & Ventusky</p>
+            <p class="text-gray-400 text-sm">Powered by Open-Meteo + Ventusky</p>
 
         </header>
 
@@ -379,7 +559,7 @@
         <!-- Main Content -->
         <div id="weatherContent" class="hidden">
             <!-- Current Weather -->
-            <section class="card rounded-2xl p-6 md:p-8 mb-6">
+            <section class="card hero-card rounded-3xl p-6 md:p-8 mb-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                     <div>
                         <h2 id="currentLocation" class="text-2xl md:text-3xl font-bold text-white mb-2"></h2>
@@ -388,7 +568,10 @@
                     </div>
                     <div class="text-left md:text-right mt-4 md:mt-0">
                         <div class="flex flex-col md:flex-row md:items-end md:justify-end md:gap-3">
-                            <div id="currentTemp" class="text-4xl md:text-6xl font-bold text-white"></div>
+                            <div class="flex items-center justify-start md:justify-end gap-3">
+                                <div id="currentIcon" class="text-5xl md:text-7xl drop-shadow-lg"></div>
+                                <div id="currentTemp" class="temp-display text-5xl md:text-7xl font-bold text-white"></div>
+                            </div>
                             <div id="currentHighLow" class="text-sm md:text-lg text-gray-300 md:mb-2"></div>
                         </div>
                         <p id="currentCondition" class="text-lg md:text-xl text-gray-300"></p>
