@@ -39,6 +39,383 @@ const JS_CONTENT = ${JSON.stringify(jsContent)};
 const FAVICON_CONTENT = ${JSON.stringify(faviconContent)};
 const APPLE_TOUCH_ICON_BASE64 = ${JSON.stringify(appleTouchIconBase64)};
 
+const POLLEN_CURRENT_PARAMS = 'us_aqi,pm10,pm2_5,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide,alder_pollen,birch_pollen,grass_pollen,weed_pollen,mugwort_pollen,olive_pollen,ragweed_pollen';
+const POLLEN_HOURLY_PARAMS = 'alder_pollen,birch_pollen,grass_pollen,weed_pollen,mugwort_pollen,olive_pollen,ragweed_pollen';
+
+function jsonResponse(data, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      ...extraHeaders,
+    },
+  });
+}
+
+function hasNumericValue(value) {
+  return value !== null && value !== undefined && Number.isFinite(Number(value));
+}
+
+function googleIndexToPollenValue(indexValue) {
+  // Google Pollen API returns an index (typically 0-5), not grains/m³.
+  // Scale it into the app's existing pollen value shape so the current UI and
+  // allergy-risk code can continue to represent unavailable values as null.
+  if (!hasNumericValue(indexValue)) return null;
+  return Math.max(0, Number(indexValue)) * 50;
+}
+
+function maxAvailableGoogleValue(values) {
+  const availableValues = values.filter(hasNumericValue).map(Number);
+  if (availableValues.length === 0) return null;
+  return Math.max(...availableValues);
+}
+
+function normalizeGoogleCode(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function getGooglePollenTypeCode(info) {
+  return normalizeGoogleCode(info?.code || info?.typeCode || info?.pollenType || info?.displayName);
+}
+
+function getGooglePlantCode(info) {
+  return normalizeGoogleCode(info?.code || info?.plantCode || info?.displayName);
+}
+
+function googleInfoHasUsableIndex(info) {
+  return info?.inSeason !== false && info?.indexInfo && hasNumericValue(info.indexInfo.value);
+}
+
+function googleInfoIsPresentWithoutIndex(info) {
+  return info && !info.indexInfo;
+}
+
+function typeCodeToAppField(typeCode) {
+  const normalized = normalizeGoogleCode(typeCode);
+  if (normalized === 'TREE') return 'tree';
+  if (normalized === 'GRASS') return 'grass';
+  if (normalized === 'WEED') return 'weed';
+  return null;
+}
+
+function plantCodeToAppField(plantCode) {
+  const normalized = normalizeGoogleCode(plantCode);
+  const plantMap = {
+    ALDER: 'alder_pollen',
+    BIRCH: 'birch_pollen',
+    OLIVE: 'olive_pollen',
+    GRAMINALES: 'grass_pollen',
+    GRASS: 'grass_pollen',
+    RAGWEED: 'ragweed_pollen',
+    MUGWORT: 'mugwort_pollen',
+  };
+  return plantMap[normalized] || null;
+}
+
+function normalizeGooglePollen(googleData) {
+  const dailyInfo = Array.isArray(googleData?.dailyInfo) ? googleData.dailyInfo : [];
+  if (dailyInfo.length === 0) return null;
+
+  const hourly = {
+    time: [],
+    alder_pollen: [],
+    birch_pollen: [],
+    olive_pollen: [],
+    grass_pollen: [],
+    weed_pollen: [],
+    mugwort_pollen: [],
+    ragweed_pollen: [],
+  };
+
+  let current = null;
+  const noneDisplayHourly = [];
+
+  for (const day of dailyInfo.slice(0, 5)) {
+    const date = day.date
+      ? [day.date.year, String(day.date.month).padStart(2, '0'), String(day.date.day).padStart(2, '0')].join('-')
+      : new Date().toISOString().split('T')[0];
+    const categoryValues = { tree: null, grass: null, weed: null };
+    const noneDisplayFields = {};
+
+    for (const info of (day.pollenTypeInfo || [])) {
+      const field = typeCodeToAppField(getGooglePollenTypeCode(info));
+      if (!field) continue;
+      if (field === 'weed' && googleInfoIsPresentWithoutIndex(info)) {
+        noneDisplayFields.weed_pollen = true;
+      }
+      if (!googleInfoHasUsableIndex(info)) continue;
+      const value = googleIndexToPollenValue(info.indexInfo.value);
+      if (hasNumericValue(value)) {
+        categoryValues[field] = categoryValues[field] === null ? value : Math.max(categoryValues[field], value);
+      }
+    }
+
+    const plantValues = {
+      alder_pollen: null,
+      birch_pollen: null,
+      olive_pollen: null,
+      grass_pollen: null,
+      weed_pollen: null,
+      mugwort_pollen: null,
+      ragweed_pollen: null,
+    };
+
+    for (const info of (day.plantInfo || [])) {
+      const field = plantCodeToAppField(getGooglePlantCode(info));
+      if (!field) continue;
+      if ((field === 'weed_pollen' || field === 'ragweed_pollen') && googleInfoIsPresentWithoutIndex(info)) {
+        noneDisplayFields[field] = true;
+      }
+      if (!googleInfoHasUsableIndex(info)) continue;
+      const value = googleIndexToPollenValue(info.indexInfo.value);
+      if (hasNumericValue(value)) {
+        plantValues[field] = plantValues[field] === null ? value : Math.max(plantValues[field], value);
+      }
+    }
+
+    plantValues.weed_pollen = categoryValues.weed;
+
+    const normalizedDay = {
+      alder_pollen: plantValues.alder_pollen ?? categoryValues.tree,
+      birch_pollen: plantValues.birch_pollen ?? categoryValues.tree,
+      olive_pollen: plantValues.olive_pollen ?? categoryValues.tree,
+      grass_pollen: plantValues.grass_pollen ?? categoryValues.grass,
+      weed_pollen: plantValues.weed_pollen,
+      mugwort_pollen: plantValues.mugwort_pollen,
+      ragweed_pollen: plantValues.ragweed_pollen,
+    };
+
+    for (const field of Object.keys(noneDisplayFields)) {
+      if (hasNumericValue(normalizedDay[field])) {
+        delete noneDisplayFields[field];
+      }
+    }
+
+    if (!current) {
+      current = {
+        us_aqi: null,
+        pm10: null,
+        pm2_5: null,
+        ozone: null,
+        nitrogen_dioxide: null,
+        sulphur_dioxide: null,
+        carbon_monoxide: null,
+        ...normalizedDay,
+      };
+    }
+    noneDisplayHourly.push(noneDisplayFields);
+
+    hourly.time.push(date + 'T12:00');
+    for (const field of POLLEN_HOURLY_PARAMS.split(',')) {
+      hourly[field].push(normalizedDay[field]);
+    }
+  }
+
+  return {
+    latitude: googleData.regionCode ? undefined : googleData.latitude,
+    longitude: googleData.longitude,
+    current,
+    hourly,
+    pollen_null_display_as_none: {
+      current: noneDisplayHourly[0] || {},
+      hourly: noneDisplayHourly,
+    },
+    pollen_source: 'google',
+    pollen_units: 'Google index scaled to app pollen value range',
+  };
+}
+
+function tomorrowIndexToPollenValue(indexValue) {
+  // Tomorrow.io pollen indexes are ordinal values (0-5). Keep the same scaling
+  // used for Google so mixed-source payloads stay in the app's expected range.
+  if (!hasNumericValue(indexValue)) return null;
+  return Math.max(0, Number(indexValue)) * 50;
+}
+
+function normalizeTomorrowPollen(tomorrowData) {
+  const intervals = Array.isArray(tomorrowData?.data?.timelines?.[0]?.intervals)
+    ? tomorrowData.data.timelines[0].intervals
+    : Array.isArray(tomorrowData?.timelines?.daily)
+      ? tomorrowData.timelines.daily.map(day => ({ startTime: day.time, values: day.values }))
+      : [];
+  if (intervals.length === 0) return null;
+
+  const hourly = {
+    time: [],
+    alder_pollen: [],
+    birch_pollen: [],
+    olive_pollen: [],
+    grass_pollen: [],
+    weed_pollen: [],
+    mugwort_pollen: [],
+    ragweed_pollen: [],
+  };
+
+  let current = null;
+  for (const interval of intervals.slice(0, 5)) {
+    const values = interval.values || {};
+    const normalizedDay = {
+      alder_pollen: null,
+      birch_pollen: null,
+      olive_pollen: null,
+      grass_pollen: tomorrowIndexToPollenValue(values.grassIndex),
+      weed_pollen: tomorrowIndexToPollenValue(values.weedIndex),
+      mugwort_pollen: null,
+      ragweed_pollen: null,
+    };
+
+    if (!current) {
+      current = {
+        us_aqi: null,
+        pm10: null,
+        pm2_5: null,
+        ozone: null,
+        nitrogen_dioxide: null,
+        sulphur_dioxide: null,
+        carbon_monoxide: null,
+        ...normalizedDay,
+      };
+    }
+
+    hourly.time.push(interval.startTime || new Date().toISOString());
+    for (const field of POLLEN_HOURLY_PARAMS.split(',')) {
+      hourly[field].push(normalizedDay[field]);
+    }
+  }
+
+  return {
+    current,
+    hourly,
+    pollen_source: 'tomorrow',
+    pollen_units: 'Tomorrow.io index scaled to app pollen value range',
+  };
+}
+
+async function fetchTomorrowPollen(lat, lon, apiKey) {
+  if (!apiKey) return null;
+  const location = encodeURIComponent(lat + ',' + lon);
+  const forecastUrl = \`https://api.tomorrow.io/v4/weather/forecast?location=\${location}&timesteps=1d&units=metric&apikey=\${encodeURIComponent(apiKey)}\`;
+  const forecastResponse = await fetch(forecastUrl);
+  if (forecastResponse.ok) {
+    const forecastData = normalizeTomorrowPollen(await forecastResponse.json());
+    if (hasNumericValue(forecastData?.current?.weed_pollen) || hasNumericValue(forecastData?.current?.grass_pollen)) {
+      return forecastData;
+    }
+  }
+
+  const timelinesUrl = \`https://api.tomorrow.io/v4/timelines?location=\${location}&fields=grassIndex,weedIndex&timesteps=1d&units=metric&apikey=\${encodeURIComponent(apiKey)}\`;
+  const timelinesResponse = await fetch(timelinesUrl);
+  if (!timelinesResponse.ok) {
+    throw new Error(\`Tomorrow.io pollen request failed with forecast status \${forecastResponse.status} and timelines status \${timelinesResponse.status}\`);
+  }
+  return normalizeTomorrowPollen(await timelinesResponse.json());
+}
+
+function mergeMissingPollen(primary, fallback, fallbackSource) {
+  if (!primary?.current || !fallback?.current) return primary;
+  let usedFallback = false;
+  const merged = JSON.parse(JSON.stringify(primary));
+  for (const field of POLLEN_HOURLY_PARAMS.split(',')) {
+    if (!hasNumericValue(merged.current[field]) && hasNumericValue(fallback.current[field])) {
+      merged.current[field] = fallback.current[field];
+      usedFallback = true;
+    }
+    if (Array.isArray(merged.hourly?.[field]) && Array.isArray(fallback.hourly?.[field])) {
+      for (let i = 0; i < merged.hourly[field].length; i++) {
+        if (!hasNumericValue(merged.hourly[field][i]) && hasNumericValue(fallback.hourly[field][i])) {
+          merged.hourly[field][i] = fallback.hourly[field][i];
+          usedFallback = true;
+        }
+      }
+    }
+  }
+  if (usedFallback) {
+    merged.pollen_source = (primary.pollen_source || 'primary') + '+' + fallbackSource;
+    merged.pollen_fallback_source = fallbackSource;
+    merged.pollen_units = [primary.pollen_units, fallback.pollen_units].filter(Boolean).join('; ');
+  }
+  return merged;
+}
+
+async function fetchOpenMeteoPollen(lat, lon) {
+  const openMeteoUrl = \`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=\${encodeURIComponent(lat)}&longitude=\${encodeURIComponent(lon)}&current=\${POLLEN_CURRENT_PARAMS}&hourly=\${POLLEN_HOURLY_PARAMS}&forecast_days=5&timezone=auto\`;
+  const response = await fetch(openMeteoUrl, {
+    headers: { 'User-Agent': 'WeatherApp/1.0 (https://weather-app.jackanglim3.workers.dev)' },
+  });
+  if (!response.ok) throw new Error(\`Open-Meteo pollen request failed with status \${response.status}\`);
+  const data = await response.json();
+  return { ...data, pollen_source: 'open-meteo' };
+}
+
+async function handlePollenRequest(url, env) {
+  const lat = url.searchParams.get('lat') || url.searchParams.get('latitude');
+  const lon = url.searchParams.get('lon') || url.searchParams.get('longitude');
+  if (!lat || !lon) {
+    return jsonResponse({ error: true, reason: 'Missing lat or lon parameters' }, 400);
+  }
+
+  if (env.GOOGLE_POLLEN_API_KEY) {
+    try {
+      // Google Maps Platform Pollen API daily forecast endpoint:
+      // https://pollen.googleapis.com/v1/forecast:lookup
+      const googleUrl = \`https://pollen.googleapis.com/v1/forecast:lookup?key=\${encodeURIComponent(env.GOOGLE_POLLEN_API_KEY)}&location.latitude=\${encodeURIComponent(lat)}&location.longitude=\${encodeURIComponent(lon)}&days=5&plantsDescription=false\`;
+      const googleResponse = await fetch(googleUrl);
+      if (googleResponse.ok) {
+        const googleData = await googleResponse.json();
+        const normalized = normalizeGooglePollen(googleData);
+        if (normalized?.current) {
+          if (!hasNumericValue(normalized.current.weed_pollen) || !hasNumericValue(normalized.current.ragweed_pollen)) {
+            const firstDay = Array.isArray(googleData.dailyInfo) ? googleData.dailyInfo[0] : null;
+            const pollenTypeSummary = (firstDay?.pollenTypeInfo || []).map(info => ({
+              code: getGooglePollenTypeCode(info),
+              inSeason: info.inSeason ?? null,
+              hasIndexInfo: Boolean(info.indexInfo),
+              indexValue: info.indexInfo?.value ?? null,
+              category: info.indexInfo?.category ?? null,
+            }));
+            const plantSummary = (firstDay?.plantInfo || [])
+              .filter(info => ['RAGWEED', 'MUGWORT'].includes(getGooglePlantCode(info)) || info?.plantDescription?.type === 'WEED')
+              .map(info => ({
+                code: getGooglePlantCode(info),
+                type: info.plantDescription?.type ?? null,
+                inSeason: info.inSeason ?? null,
+                hasIndexInfo: Boolean(info.indexInfo),
+                indexValue: info.indexInfo?.value ?? null,
+                category: info.indexInfo?.category ?? null,
+              }));
+            console.warn('Google pollen weed/ragweed unavailable in first day', JSON.stringify({ pollenTypeSummary, plantSummary }));
+          }
+          return jsonResponse(normalized, 200, { 'X-Pollen-Source': normalized.pollen_source || 'google' });
+        }
+      } else {
+        console.warn('Google Pollen API unavailable; falling back to Open-Meteo. Status:', googleResponse.status);
+      }
+    } catch (error) {
+      console.warn('Google Pollen API failed; falling back to Open-Meteo:', error.message);
+    }
+  }
+
+  if (env.TOMORROW_API_KEY) {
+    try {
+      const tomorrowData = await fetchTomorrowPollen(lat, lon, env.TOMORROW_API_KEY);
+      if (tomorrowData?.current) {
+        return jsonResponse(tomorrowData, 200, { 'X-Pollen-Source': tomorrowData.pollen_source || 'tomorrow' });
+      }
+    } catch (error) {
+      console.warn('Tomorrow.io pollen fallback failed; falling back to Open-Meteo:', error.message);
+    }
+  }
+
+  try {
+    const openMeteoData = await fetchOpenMeteoPollen(lat, lon);
+    return jsonResponse(openMeteoData, 200, { 'X-Pollen-Source': 'open-meteo' });
+  } catch (error) {
+    console.error('Open-Meteo pollen fallback failed:', error.message);
+    return jsonResponse({ error: true, reason: 'Pollen data unavailable' }, 503);
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -87,6 +464,10 @@ export default {
       const apiPath = url.pathname.replace('/api/', '');
       let targetUrl;
       
+      if (apiPath.startsWith('pollen')) {
+        return handlePollenRequest(url, env);
+      }
+
       // Geocoding API uses a different base URL
       if (apiPath.startsWith('geocoding')) {
         // Convert /api/geocoding?name=... to geocoding-api.open-meteo.com/v1/search?name=...
@@ -591,7 +972,23 @@ export default {
           </script>
         \`;
         
-        // Inject the script before closing head tag, or at the beginning of body
+        // Inject framebreaker-neutralizer at the very start of <head>, before any Ventusky scripts run.
+        // Ventusky has a framebuster that sets top.location — this overrides window.top/parent
+        // so the iframe thinks it IS the top-level window and never fires the redirect.
+        const framebreakerScript = \`<script>
+          (function() {
+            try { Object.defineProperty(window, 'top', { get: function() { return window; } }); } catch(e) {}
+            try { Object.defineProperty(window, 'parent', { get: function() { return window; } }); } catch(e) {}
+            try { Object.defineProperty(window, 'frameElement', { get: function() { return null; } }); } catch(e) {}
+          })();
+        </script>\`;
+        if (html.includes('<head>')) {
+          html = html.replace('<head>', '<head>' + framebreakerScript);
+        } else if (html.includes('<head ')) {
+          html = html.replace(/<head([^>]*)>/, '<head$1>' + framebreakerScript);
+        }
+
+        // Inject button-hiding CSS/JS before closing </head>
         if (html.includes('</head>')) {
           html = html.replace('</head>', hideButtonScript + '</head>');
         } else if (html.includes('<body')) {
