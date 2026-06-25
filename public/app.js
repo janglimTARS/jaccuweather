@@ -3847,28 +3847,31 @@ function openHourlyModal(data) {
         });
     }
 
-    // Build tide annotations for H/L markers
-    const tideAnnotations = {};
-    tideMarkerLabels.forEach((point) => {
-        const labelKey = `tideLabel_${point.index}_${point.text}`;
-        tideAnnotations[labelKey] = {
-            x: point.index,
-            y: point.value,
+    // Build tide annotations for H/L markers (ApexCharts points annotations - must be an array)
+    const tideAnnotations = tideMarkerLabels.map((point) => ({
+        x: tideLabels[point.index],
+        y: point.value,
+        marker: {
+            size: 5,
+            fillColor: point.text === 'H' ? '#67e8f9' : '#22d3ee',
+            strokeColor: '#fff',
+            strokeWidth: 1,
+            shape: point.text === 'H' ? 'circle' : 'square'
+        },
+        label: {
+            text: point.text,
             borderColor: 'transparent',
-            label: {
-                text: point.text,
-                position: 'top',
-                offsetY: -8,
-                style: {
-                    background: 'transparent',
-                    color: '#67e8f9',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    cssClass: 'apexcharts-tide-label'
-                }
+            offsetX: 0,
+            offsetY: -8,
+            style: {
+                background: 'transparent',
+                color: '#67e8f9',
+                fontSize: '11px',
+                fontWeight: 600,
+                cssClass: 'apexcharts-tide-label'
             }
-        };
-    });
+        }
+    }));
 
     hourlyChart = {};
     hourlyChart.temp = new ApexCharts(document.getElementById('hourlyTempChart'), baseChartOptions({
@@ -3954,17 +3957,15 @@ function openHourlyModal(data) {
     hourlyChart.brightness.render();
 
     hourlyChart.tides = (hasTideData && tideChartEl) ? new ApexCharts(tideChartEl, baseChartOptions({
-        chart: { type: 'line' },
+        chart: { type: 'area' },
         series: [
-            { name: 'Tide Height (ft, MLLW)', data: tideValues, type: 'area' },
-            { name: 'High Tide', data: tideHighMarkers, type: 'scatter' },
-            { name: 'Low Tide', data: tideLowMarkers, type: 'scatter' }
+            { name: 'Tide Height (ft, MLLW)', data: tideValues }
         ],
-        colors: ['#06b6d4', '#67e8f9', '#22d3ee'],
-        stroke: { curve: 'smooth', width: [3, 0, 0] },
-        fill: { type: ['gradient', 'solid', 'solid'], opacity: [0.3, 1, 1] },
-        markers: { size: [0, 6, 6], shape: ['circle', 'circle', 'square'] },
-        xaxis: { categories: tideLabels },
+        colors: ['#06b6d4'],
+        stroke: { curve: 'smooth', width: 3 },
+        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
+        markers: { size: 0, hover: { size: 4 } },
+        xaxis: { categories: tideLabels, tickAmount: 6 },
         yaxis: { min: tideYAxisBounds.min, max: tideYAxisBounds.max, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val} ft` } },
         tooltip: { y: { formatter: (val) => `${Number(val).toFixed(1)} ft` } },
         annotations: { points: tideAnnotations }
@@ -4198,28 +4199,31 @@ function openDailyModal(data) {
     const maxDailyShortwave = Math.max(...dailyShortwaveAverage.filter(v => v !== null && v !== undefined && v > 0), 1);
     const dailyBrightnessData = dailyShortwaveAverage.map(v => v === null || v === undefined ? 0 : Math.round((v / maxDailyShortwave) * 100));
 
-    // Build daily tide annotations for H/L markers
-    const dailyTideAnnotations = {};
-    dailyTideMarkerLabels.forEach((point) => {
-        const labelKey = `dailyTideLabel_${point.index}_${point.text}`;
-        dailyTideAnnotations[labelKey] = {
-            x: point.index,
-            y: point.value,
+    // Build daily tide annotations for H/L markers (array format for ApexCharts)
+    const dailyTideAnnotations = dailyTideMarkerLabels.map((point) => ({
+        x: dailyTideLabels[point.index],
+        y: point.value,
+        marker: {
+            size: 4,
+            fillColor: point.text === 'H' ? '#67e8f9' : '#22d3ee',
+            strokeColor: '#fff',
+            strokeWidth: 1,
+            shape: point.text === 'H' ? 'circle' : 'square'
+        },
+        label: {
+            text: point.text,
             borderColor: 'transparent',
-            label: {
-                text: point.text,
-                position: 'top',
-                offsetY: -8,
-                style: {
-                    background: 'transparent',
-                    color: '#67e8f9',
-                    fontSize: '10px',
-                    fontWeight: 600,
-                    cssClass: 'apexcharts-tide-label'
-                }
+            offsetX: 0,
+            offsetY: -8,
+            style: {
+                background: 'transparent',
+                color: '#67e8f9',
+                fontSize: '10px',
+                fontWeight: 600,
+                cssClass: 'apexcharts-tide-label'
             }
-        };
-    });
+        }
+    }));
 
     // Create charts
     dailyChart = {};
@@ -4331,16 +4335,14 @@ function openDailyModal(data) {
     dailyChart.brightness.render();
 
     dailyChart.tides = (hasDailyTideData && dailyTideChartEl) ? new ApexCharts(dailyTideChartEl, baseChartOptions({
-        chart: { type: 'line' },
+        chart: { type: 'area' },
         series: [
-            { name: 'Tide Height (ft, MLLW)', data: dailyTideValues, type: 'area' },
-            { name: 'High Tide', data: dailyTideHighMarkers, type: 'scatter' },
-            { name: 'Low Tide', data: dailyTideLowMarkers, type: 'scatter' }
+            { name: 'Tide Height (ft, MLLW)', data: dailyTideValues }
         ],
-        colors: ['#06b6d4', '#67e8f9', '#22d3ee'],
-        stroke: { curve: 'smooth', width: [3, 0, 0] },
-        fill: { type: ['gradient', 'solid', 'solid'], opacity: [0.3, 1, 1] },
-        markers: { size: [0, 6, 6], shape: ['circle', 'circle', 'square'] },
+        colors: ['#06b6d4'],
+        stroke: { curve: 'smooth', width: 3 },
+        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
+        markers: { size: 0, hover: { size: 4 } },
         xaxis: { categories: dailyTideLabels, tickAmount: 14 },
         yaxis: { min: dailyTideYAxisBounds.min, max: dailyTideYAxisBounds.max, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val} ft` } },
         tooltip: {
