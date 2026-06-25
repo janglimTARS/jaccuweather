@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jaccuweather</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=e0bc3a4d">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Jaccuweather">
@@ -217,6 +217,139 @@
         .forecast-chip {
             border: 1px solid rgba(148, 163, 184, 0.16);
             background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.055));
+        }
+
+        /* ── iOS 27-style Highlights Toggle ── */
+        .highlights-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0;
+            padding: 3px;
+            border-radius: 9999px;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            position: relative;
+        }
+
+        .highlights-toggle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 32px;
+            border-radius: 9999px;
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.45);
+            cursor: pointer;
+            transition: color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+            font-size: 16px;
+            line-height: 1;
+            z-index: 1;
+            position: relative;
+        }
+
+        .highlights-toggle-btn:hover {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .highlights-toggle-btn.active {
+            background: rgba(255, 255, 255, 0.13);
+            color: #fff;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .highlights-toggle-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: rgba(255, 255, 255, 0.55);
+            margin-right: 10px;
+            transition: color 0.25s ease;
+        }
+
+        .highlights-toggle-label.active {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Hourly view visibility */
+        .hourly-view {
+            display: none;
+        }
+        .hourly-view.active {
+            display: flex;
+        }
+
+        /* Daily view visibility (block, not flex) */
+        .daily-view {
+            display: none;
+        }
+        .daily-view.active {
+            display: block;
+        }
+
+        /* Hourly view chips — uniform sizing across all toggle modes */
+        .hourly-chip {
+            min-width: 80px;
+            min-height: 138px;
+        }
+
+        /* Hourly precipitation bar (for 48h view) */
+        .hourly-precip-bar-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 44px;
+            margin: 0 auto;
+        }
+        .hourly-precip-bar {
+            width: 6px;
+            border-radius: 3px;
+            background: linear-gradient(180deg, rgba(90, 200, 250, 0.9), rgba(56, 189, 248, 0.5));
+            transition: height 0.3s ease;
+            min-height: 2px;
+        }
+        .hourly-precip-bar.zero {
+            background: rgba(148, 163, 184, 0.15);
+            height: 2px;
+        }
+
+        /* Daily precipitation intensity bar chart */
+        .daily-precip-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 36px;
+            flex: 1;
+            max-width: 200px;
+            margin: 0 1rem;
+        }
+        .daily-precip-bar {
+            flex: 1;
+            min-width: 3px;
+            border-radius: 2px;
+            background: rgba(148, 120, 180, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .daily-precip-bar-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-radius: 2px;
+            background: linear-gradient(180deg, rgba(90, 200, 250, 0.9), rgba(56, 189, 248, 0.6));
+        }
+
+        /* Wind direction arrow */
+        .wind-arrow {
+            display: inline-block;
+            font-size: 1.5rem;
+            color: rgba(56, 189, 248, 0.8);
+            transition: transform 0.3s ease;
+            line-height: 1;
         }
 
         .daily-forecast-card {
@@ -471,7 +604,7 @@
         }
     </style>
 </head>
-<body class="text-white p-3 sm:p-4 md:p-8 selection:bg-sky-300/30 selection:text-white"><a href="https://weather.janglim.cloud/cdn-cgi/content?id=s.eb_kkdiooErPPSGnf0Mnxbw5jvX5ElwNl3SmyfnIA-1782299416.7714193-1.2.1.1-cxCM2_RbqzYf8TB4RK0b03.5zJcTyxhxT7F.rZhFb8c" aria-hidden="true" rel="nofollow noopener" style="display: none !important; visibility: hidden !important"></a>
+<body class="text-white p-3 sm:p-4 md:p-8 selection:bg-sky-300/30 selection:text-white">
     <div class="max-w-6xl mx-auto relative z-10">
         <!-- Header -->
         <header class="text-center mb-8">
@@ -665,12 +798,48 @@
 
             <!-- Hourly Forecast -->
             <section class="card rounded-2xl p-6 md:p-8 mb-6">
-                <h3 class="text-xl font-bold text-white mb-4 cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-2" id="hourlyHeader">
-                    <span class="text-2xl">⏰</span> 48-Hour Forecast <i class="fas fa-external-link-alt ml-2 text-sm text-gray-400"></i>
-                </h3>
-                <div id="hourlyForecast" class="overflow-x-auto">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <h3 class="text-xl font-bold text-white cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-2" id="hourlyHeader">
+                        <span class="text-2xl">⏰</span> 48-Hour Forecast <i class="fas fa-external-link-alt ml-2 text-sm text-gray-400"></i>
+                    </h3>
+                    <!-- iOS 27-style highlights toggle -->
+                    <div class="flex items-center">
+                        <span class="highlights-toggle-label active" id="hourlyToggleLabel">Conditions</span>
+                        <div class="highlights-toggle" id="hourlyHighlightsToggle">
+                            <button class="highlights-toggle-btn active" data-mode="conditions" title="Conditions">
+                                <!-- cloud icon -->
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.78 7 7 0 1 0-13.6 2.78A4.5 4.5 0 0 0 5.5 19h12z"/></svg>
+                            </button>
+                            <button class="highlights-toggle-btn" data-mode="precipitation" title="Precipitation">
+                                <!-- droplet icon -->
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                            </button>
+                            <button class="highlights-toggle-btn" data-mode="wind" title="Wind">
+                                <!-- wind icon -->
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conditions view (default, existing) -->
+                <div id="hourlyViewConditions" class="hourly-view active overflow-x-auto">
                     <div class="flex gap-3 min-w-max pb-2">
-                        <!-- Hourly items will be inserted here -->
+                        <!-- Hourly items inserted here -->
+                    </div>
+                </div>
+
+                <!-- Precipitation view -->
+                <div id="hourlyViewPrecipitation" class="hourly-view overflow-x-auto">
+                    <div class="flex gap-3 min-w-max pb-2" id="hourlyPrecipContainer">
+                        <!-- Precip bars inserted here -->
+                    </div>
+                </div>
+
+                <!-- Wind view -->
+                <div id="hourlyViewWind" class="hourly-view overflow-x-auto">
+                    <div class="flex gap-3 min-w-max pb-2" id="hourlyWindContainer">
+                        <!-- Wind items inserted here -->
                     </div>
                 </div>
             </section>
@@ -1141,5 +1310,5 @@
             Donate
         </a>
     </footer>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a10b48fac8cb4344',t:'MTc4MjI5OTQxNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
