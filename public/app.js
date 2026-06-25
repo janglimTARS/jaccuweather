@@ -3972,7 +3972,7 @@ function openHourlyModal(data) {
         fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
         markers: { size: 0, hover: { size: 4 } },
         xaxis: { categories: tideLabels, tickAmount: 6 },
-        yaxis: { min: tideYAxisBounds.min, max: tideYAxisBounds.max, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val} ft` } },
+        yaxis: { min: tideYAxisBounds.min, max: tideYAxisBounds.max, tickAmount: 5, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${Number(val).toFixed(1)} ft` } },
         tooltip: { y: { formatter: (val) => `${Number(val).toFixed(1)} ft` } },
         annotations: { points: tideAnnotations }
     })) : null;
@@ -4349,8 +4349,8 @@ function openDailyModal(data) {
         stroke: { curve: 'smooth', width: 3 },
         fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
         markers: { size: 0, hover: { size: 4 } },
-        xaxis: { categories: dailyTideLabels, tickAmount: 14 },
-        yaxis: { min: dailyTideYAxisBounds.min, max: dailyTideYAxisBounds.max, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val} ft` } },
+        xaxis: { categories: dailyTideLabels, tickAmount: 7 },
+        yaxis: { min: dailyTideYAxisBounds.min, max: dailyTideYAxisBounds.max, tickAmount: 5, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${Number(val).toFixed(1)} ft` } },
         tooltip: {
             x: { formatter: (_val, opts) => {
                 const idx = opts?.dataPointIndex;
