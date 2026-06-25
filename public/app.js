@@ -3680,7 +3680,7 @@ function initializeChartSelector(selectId) {
     const chartContainers = modal.querySelectorAll('.chart-container');
 
     function updateChartVisibility() {
-        const selectedValue = select.value;
+        const selectedValue = document.getElementById(selectId).value;
 
         chartContainers.forEach(container => {
             if (container.dataset.featureHidden === 'true') {
@@ -3700,7 +3700,7 @@ function initializeChartSelector(selectId) {
     select.value = 'temp';
     updateChartVisibility();
 
-    // Replace select with clone to remove stale event listeners
+    // Remove old listener by cloning, then attach fresh
     const newSelect = select.cloneNode(true);
     select.parentNode.replaceChild(newSelect, select);
     newSelect.addEventListener('change', updateChartVisibility);
