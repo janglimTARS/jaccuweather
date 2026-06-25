@@ -3,8 +3,8 @@ let currentLon = null;
 let currentLocationName = null;
 let currentWeatherData = null; // Store full weather data for modals
 let favorites = []; // Array of favorite locations
-let hourlyChart = null;
-let dailyChart = null;
+let hourlyChart = {};
+let dailyChart = {};
 let currentTideData = null;
 let searchDebounceTimer = null;
 let searchSuggestions = [];
@@ -40,133 +40,79 @@ const US_BOUNDS = {
     maxLon: -66
 };
 
-const CHART_SCRUB_EVENTS = ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend', 'touchcancel'];
-const CHART_TOOLTIP_BASE = {
-    enabled: true,
-    mode: 'index',
-    intersect: false,
-    position: 'nearest',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    titleColor: '#fff',
-    bodyColor: '#fff',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 1,
-    padding: 12,
-    displayColors: true,
-    caretSize: 0
-};
+// ── ApexCharts shared base options ──
+function baseChartOptions(overrides = {}) {
+    // Extract categories from overrides without clobbering base label settings
+    const xaxisCategories = overrides.xaxis?.categories;
+    const xaxisTickAmount = overrides.xaxis?.tickAmount;
 
-function setChartCrosshairFromEvent(chart, event) {
-    if (!chart || !event || !chart.chartArea) return false;
-
-    const active = chart.getElementsAtEventForMode(event, 'index', {
-        intersect: false,
-        axis: 'x'
-    }, false);
-
-    if (!active.length) {
-        chart.crosshairX = undefined;
-        chart.setActiveElements([]);
-        if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
-        return true;
-    }
-
-    const firstPoint = active[0];
-    const pointElement = chart.getDatasetMeta(firstPoint.datasetIndex)?.data?.[firstPoint.index];
-    const crosshairX = pointElement?.x;
-
-    if (crosshairX === undefined || crosshairX === null) return false;
-
-    chart.crosshairX = crosshairX;
-    chart.setActiveElements(active);
-    if (chart.tooltip) {
-        chart.tooltip.setActiveElements(active, {
-            x: crosshairX,
-            y: chart.chartArea.top
-        });
-    }
-
-    return true;
-}
-
-function withChartScrubbing(options = {}) {
-    const existingPlugins = options.plugins || {};
-    const existingTooltip = existingPlugins.tooltip || {};
-
-    return {
-        ...options,
-        events: options.events || CHART_SCRUB_EVENTS,
-        interaction: {
-            mode: 'index',
-            intersect: false,
-            axis: 'x',
-            ...(options.interaction || {})
+    const opts = {
+        chart: {
+            type: 'area',
+            background: 'transparent',
+            foreColor: '#fff',
+            toolbar: { show: false },
+            animations: { enabled: true, easing: 'easeinout', speed: 600 },
+            fontFamily: 'inherit',
+            height: 250,
+            ...overrides.chart
         },
-        onHover: (event, _elements, chart) => {
-            if (!chart || !event) return;
-            if (event.type === 'mouseout') {
-                chart.crosshairX = undefined;
-                chart.setActiveElements([]);
-                if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
-                chart.draw();
-                return;
-            }
-            if (setChartCrosshairFromEvent(chart, event)) {
-                chart.draw();
+        theme: { mode: 'dark' },
+        grid: { borderColor: 'rgba(255,255,255,0.08)', strokeDashArray: 3 },
+        legend: { show: true, position: 'top', labels: { colors: '#fff' }, fontSize: '13px' },
+        stroke: { curve: 'smooth', width: 3, lineCap: 'round' },
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shadeIntensity: 1,
+                opacityFrom: 0.4,
+                opacityTo: 0.02,
+                stops: [0, 100]
             }
         },
-        plugins: {
-            ...existingPlugins,
-            tooltip: {
-                ...CHART_TOOLTIP_BASE,
-                ...existingTooltip
-            }
-        }
+        markers: { size: 0, hover: { size: 5 } },
+        dataLabels: { enabled: false },
+        tooltip: { theme: 'dark' },
+        xaxis: {
+            categories: xaxisCategories || [],
+            tickAmount: xaxisTickAmount || 6,
+            labels: {
+                style: { colors: '#fff', fontSize: '11px' },
+                rotate: -40,
+                rotateAlways: false,
+                hideOverlappingLabels: true,
+            },
+        },
+        yaxis: {
+            labels: { style: { colors: '#fff', fontSize: '12px' } },
+        },
     };
-}
 
-const crosshairPlugin = {
-    id: 'crosshair',
-    afterEvent(chart, args) {
-        const event = args?.event;
-        if (!event) return;
+    // Merge overrides on top, but preserve xaxis/yaxis base settings
+    const merged = { ...opts, ...overrides };
 
-        if (event.type === 'touchend' || event.type === 'touchcancel' || event.type === 'mouseout') {
-            if (chart.crosshairX !== undefined) {
-                chart.crosshairX = undefined;
-                chart.setActiveElements([]);
-                if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
-                chart.draw();
-            }
-            return;
-        }
+    // Re-apply xaxis/yaxis so base label settings survive override clobbering
+    merged.xaxis = {
+        categories: xaxisCategories || overrides.xaxis?.categories || [],
+        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || 6,
+        labels: {
+            style: { colors: '#fff', fontSize: '11px' },
+            rotate: -40,
+            rotateAlways: false,
+            hideOverlappingLabels: true,
+            ...overrides.xaxis?.labels,
+        },
+        ...overrides.xaxis,
+        categories: xaxisCategories || overrides.xaxis?.categories || [],
+        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || 6,
+    };
 
-        if (event.type === 'mousemove' || event.type === 'touchmove' || event.type === 'touchstart') {
-            if (setChartCrosshairFromEvent(chart, event)) {
-                chart.draw();
-            }
-        }
-    },
-    afterDraw(chart) {
-        if (chart.crosshairX === undefined || !chart.chartArea) return;
+    merged.yaxis = {
+        labels: { style: { colors: '#fff', fontSize: '12px' } },
+        ...overrides.yaxis,
+    };
 
-        const { ctx, chartArea } = chart;
-        const x = chart.crosshairX;
-        if (x < chartArea.left || x > chartArea.right) return;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(x, chartArea.top);
-        ctx.lineTo(x, chartArea.bottom);
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.stroke();
-        ctx.restore();
-    }
-};
-
-if (window.Chart) {
-    Chart.register(crosshairPlugin);
+    return merged;
 }
 
 // Format units from API (e.g., "mp/h" -> "mph")
@@ -999,26 +945,24 @@ function computeTideYAxisBounds(values) {
     return { min, max };
 }
 
-function clearTideChartCanvas(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    context.clearRect(0, 0, canvas.width, canvas.height);
+function clearTideChartContainer(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
 }
 
 function clearTideUiState() {
-    if (hourlyChart?.tides) {
+    if (hourlyChart.tides) {
         hourlyChart.tides.destroy();
-        hourlyChart.tides = null;
+        delete hourlyChart.tides;
     }
-    if (dailyChart?.tides) {
+    if (dailyChart.tides) {
         dailyChart.tides.destroy();
-        dailyChart.tides = null;
+        delete dailyChart.tides;
     }
 
-    clearTideChartCanvas('hourlyTidesChart');
-    clearTideChartCanvas('dailyTidesChart');
+    clearTideChartContainer('hourlyTidesChart');
+    clearTideChartContainer('dailyTidesChart');
 }
 
 function setHourlyTidesVisibility(tideData) {
@@ -3756,8 +3700,10 @@ function initializeChartSelector(selectId) {
     select.value = 'temp';
     updateChartVisibility();
 
-    // Add change event listener
-    select.addEventListener('change', updateChartVisibility);
+    // Replace select with clone to remove stale event listeners
+    const newSelect = select.cloneNode(true);
+    select.parentNode.replaceChild(newSelect, select);
+    newSelect.addEventListener('change', updateChartVisibility);
 }
 
 // Modal functionality
@@ -3769,16 +3715,14 @@ function openHourlyModal(data) {
     const isMobileChartViewport = window.innerWidth <= 768;
     const modalChartAspectRatio = isMobileChartViewport ? 1.2 : 2.2;
 
-    // Hide all chart containers during modal animation so Chart.js doesn't
-    // fire resize events while the slide-in is running (can trigger axis growth loops)
-    modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'none');
+    // Show all chart containers so ApexCharts can measure width
+    modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'block');
 
     // Destroy existing charts if they exist
-    if (hourlyChart) {
-        Object.values(hourlyChart).forEach(chart => {
-            if (chart) chart.destroy();
-        });
-    }
+    Object.values(hourlyChart).forEach(chart => {
+        if (chart) chart.destroy();
+    });
+    hourlyChart = {};
 
     // Prepare data
     const now = new Date();
@@ -3841,32 +3785,11 @@ function openHourlyModal(data) {
     const brightnessData = shortwaveData.map(v => v === null || v === undefined ? 0 : Math.round((v / maxRadiation) * 100));
 
     // Create charts
-    const chartConfig = {
-        type: 'line',
-        options: withChartScrubbing({
-            responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: modalChartAspectRatio,
-            plugins: {
-                legend: {
-                    labels: { color: '#fff' }
-                }
-            },
-            scales: {
-                x: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
-                y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
-            }
-        })
-    };
-
     // Check if there's any snow in the hourly forecast
     const hasSnowHourly = snow.some(val => val > 0);
 
     const tideChartContainer = document.getElementById('hourlyTidesChartContainer');
-    const tideChartCanvas = document.getElementById('hourlyTidesChart');
-    if (tideChartCanvas) {
-        tideChartCanvas.height = 220;
-    }
+    const tideChartEl = document.getElementById('hourlyTidesChart');
     const nowMs = Date.now();
     const end48hMs = nowMs + (48 * 60 * 60 * 1000);
     const tideCurve48h = currentTideData?.interpolatedPredictions
@@ -3924,277 +3847,129 @@ function openHourlyModal(data) {
         });
     }
 
-    const tideMarkerLabelPlugin = {
-        id: 'tideMarkerLabelPlugin',
-        afterDatasetsDraw(chart) {
-            if (!chart?.$tideMarkerLabels || chart.$tideMarkerLabels.length === 0) return;
-            const { ctx, scales } = chart;
-            const xScale = scales.x;
-            const yScale = scales.y;
-            ctx.save();
-            ctx.fillStyle = '#67e8f9';
-            ctx.font = '600 11px Inter, sans-serif';
-            ctx.textAlign = 'center';
-
-            chart.$tideMarkerLabels.forEach((point) => {
-                const x = xScale.getPixelForValue(point.index);
-                const y = yScale.getPixelForValue(point.value);
-                ctx.fillText(point.text, x, y - 10);
-            });
-            ctx.restore();
-        }
-    };
-
-    hourlyChart = {
-        temp: new Chart(document.getElementById('hourlyTempChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: `Temperature (${UNITS.temperature})`,
-                    data: temps,
-                    borderColor: 'rgb(255, 99, 132)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    tension: 0.4
-                }]
-            }
-        }),
-        precip: new Chart(document.getElementById('hourlyPrecipChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: `Precipitation (${UNITS.precipitation})`,
-                    data: precip,
-                    borderColor: 'rgb(54, 162, 235)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            }
-        }),
-        wind: new Chart(document.getElementById('hourlyWindChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: `Wind Speed (${UNITS.wind})`,
-                    data: wind,
-                    borderColor: 'rgb(255, 206, 86)',
-                    backgroundColor: 'rgba(255, 206, 86, 0.2)',
-                    tension: 0.4
-                }]
-            }
-        }),
-        humidity: new Chart(document.getElementById('hourlyHumidityChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: `Humidity (${UNITS.humidity})`,
-                    data: humidity,
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    tension: 0.4
-                }]
-            }
-        }),
-        pressure: new Chart(document.getElementById('hourlyPressureChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Pressure (inHg)',
-                    data: pressure,
-                    borderColor: 'rgb(34, 197, 94)',
-                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                    tension: 0.4
-                }]
-            }
-        }),
-        snow: new Chart(document.getElementById('hourlySnowChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: `Snowfall (${UNITS.snowfall})`,
-                    data: snow,
-                    borderColor: 'rgb(176, 196, 222)',
-                    backgroundColor: 'rgba(176, 196, 222, 0.2)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            }
-        }),
-        cloud: new Chart(document.getElementById('hourlyCloudChart'), {
-            type: 'bar',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: 'Low Clouds',
-                        data: cloudLow,
-                        backgroundColor: 'rgba(100, 116, 139, 0.75)',
-                        stack: 'cloud'
-                    },
-                    {
-                        label: 'Mid Clouds',
-                        data: cloudMid,
-                        backgroundColor: 'rgba(148, 163, 184, 0.7)',
-                        stack: 'cloud'
-                    },
-                    {
-                        label: 'High Clouds',
-                        data: cloudHigh,
-                        backgroundColor: 'rgba(203, 213, 225, 0.65)',
-                        stack: 'cloud'
-                    }
-                ]
-            },
-            options: withChartScrubbing({
-                responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: modalChartAspectRatio,
-                plugins: {
-                    legend: {
-                        labels: { color: '#fff' }
-                    }
-                },
-                scales: {
-                    x: {
-                        stacked: true,
-                        ticks: { color: '#fff' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    },
-                    y: {
-                        stacked: true,
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            color: '#fff',
-                            callback: value => `${value}%`
-                        },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
+    // Build tide annotations for H/L markers
+    const tideAnnotations = {};
+    tideMarkerLabels.forEach((point) => {
+        const labelKey = `tideLabel_${point.index}_${point.text}`;
+        tideAnnotations[labelKey] = {
+            x: point.index,
+            y: point.value,
+            borderColor: 'transparent',
+            label: {
+                text: point.text,
+                position: 'top',
+                offsetY: -8,
+                style: {
+                    background: 'transparent',
+                    color: '#67e8f9',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cssClass: 'apexcharts-tide-label'
                 }
-            })
-        }),
-        brightness: new Chart(document.getElementById('hourlyBrightnessChart'), {
-            type: 'line',
-            options: withChartScrubbing({
-                responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: modalChartAspectRatio,
-                plugins: {
-                    legend: {
-                        labels: { color: '#fff' }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: '#fff' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    },
-                    y: {
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            color: '#fff',
-                            callback: value => value + '%'
-                        },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
-                }
-            }),
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Brightness (%)',
-                    data: brightnessData,
-                    borderColor: 'rgb(250, 204, 21)',
-                    backgroundColor: 'rgba(250, 204, 21, 0.2)',
-                    tension: 0.4,
-                    fill: true
-                }]
             }
-        }),
-        tides: (hasTideData && tideChartCanvas) ? new Chart(tideChartCanvas, {
-            type: 'line',
-            data: {
-                labels: tideLabels,
-                datasets: [
-                    {
-                        label: 'Tide Height (ft, MLLW)',
-                        data: tideValues,
-                        borderColor: '#06b6d4',
-                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
-                        tension: 0.45,
-                        fill: true,
-                        pointRadius: 0
-                    },
-                    {
-                        label: 'High Tide',
-                        data: tideHighMarkers,
-                        borderColor: '#67e8f9',
-                        backgroundColor: '#67e8f9',
-                        pointRadius: 4,
-                        pointHoverRadius: 5,
-                        pointStyle: 'circle',
-                        showLine: false
-                    },
-                    {
-                        label: 'Low Tide',
-                        data: tideLowMarkers,
-                        borderColor: '#22d3ee',
-                        backgroundColor: '#22d3ee',
-                        pointRadius: 4,
-                        pointHoverRadius: 5,
-                        pointStyle: 'rectRot',
-                        showLine: false
-                    }
-                ]
-            },
-            options: withChartScrubbing({
-                animation: {
-                    duration: 0
-                },
-                responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: modalChartAspectRatio,
-                plugins: {
-                    legend: {
-                        labels: { color: '#fff' }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} ft`
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: '#fff' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    },
-                    y: {
-                        beginAtZero: false,
-                        min: tideYAxisBounds.min,
-                        max: tideYAxisBounds.max,
-                        ticks: {
-                            color: '#fff',
-                            callback: (value) => `${value} ft`
-                        },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
-                }
-            }),
-            plugins: [tideMarkerLabelPlugin]
-        }) : null
-    };
+        };
+    });
 
-    if (hourlyChart.tides) {
-        hourlyChart.tides.$tideMarkerLabels = tideMarkerLabels;
-    }
+    hourlyChart = {};
+    hourlyChart.temp = new ApexCharts(document.getElementById('hourlyTempChart'), baseChartOptions({
+        series: [{ name: `Temperature (${UNITS.temperature})`, data: temps }],
+        colors: ['rgb(255, 99, 132)'],
+        
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "°F", style: { color: "#fff" } } }
+    }));
+    hourlyChart.temp.render();
+
+    hourlyChart.precip = new ApexCharts(document.getElementById('hourlyPrecipChart'), baseChartOptions({
+        series: [{ name: `Precipitation (${UNITS.precipitation})`, data: precip }],
+        colors: ['rgb(54, 162, 235)'],
+        
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "inches", style: { color: '#fff' } } }
+    }));
+    hourlyChart.precip.render();
+
+    hourlyChart.wind = new ApexCharts(document.getElementById('hourlyWindChart'), baseChartOptions({
+        series: [{ name: `Wind Speed (${UNITS.wind})`, data: wind }],
+        colors: ['rgb(255, 206, 86)'],
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "mph", style: { color: "#fff" } } }
+    }));
+    hourlyChart.wind.render();
+
+    hourlyChart.humidity = new ApexCharts(document.getElementById('hourlyHumidityChart'), baseChartOptions({
+        series: [{ name: `Humidity (${UNITS.humidity})`, data: humidity }],
+        colors: ['rgb(75, 192, 192)'],
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "%", style: { color: "#fff" } } }
+    }));
+    hourlyChart.humidity.render();
+
+    hourlyChart.pressure = new ApexCharts(document.getElementById('hourlyPressureChart'), baseChartOptions({
+        series: [{ name: 'Pressure (inHg)', data: pressure }],
+        colors: ['rgb(34, 197, 94)'],
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "inHg", style: { color: "#fff" } } }
+    }));
+    hourlyChart.pressure.render();
+
+    hourlyChart.snow = new ApexCharts(document.getElementById('hourlySnowChart'), baseChartOptions({
+        series: [{ name: `Snowfall (${UNITS.snowfall})`, data: snow }],
+        colors: ['rgb(176, 196, 222)'],
+        
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "inches", style: { color: "#fff" } } }
+    }));
+    hourlyChart.snow.render();
+
+    hourlyChart.cloud = new ApexCharts(document.getElementById('hourlyCloudChart'), baseChartOptions({
+        chart: { type: 'bar', stacked: true },
+        series: [
+            { name: 'Low Clouds', data: cloudLow },
+            { name: 'Mid Clouds', data: cloudMid },
+            { name: 'High Clouds', data: cloudHigh }
+        ],
+        colors: ['rgba(100, 116, 139, 0.75)', 'rgba(148, 163, 184, 0.7)', 'rgba(203, 213, 225, 0.65)'],
+        fill: { type: 'solid' },
+        plotOptions: { bar: { borderRadius: 2 } },
+        xaxis: { categories: labels },
+        yaxis: { min: 0, max: 100, title: { text: '%', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val}%` } }
+    }));
+    hourlyChart.cloud.render();
+
+    hourlyChart.brightness = new ApexCharts(document.getElementById('hourlyBrightnessChart'), baseChartOptions({
+        series: [{ name: 'Brightness (%)', data: brightnessData }],
+        colors: ['rgb(250, 204, 21)'],
+        
+        
+        xaxis: { categories: labels },
+        yaxis: { min: 0, max: 100, title: { text: '%', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val}%` } }
+    }));
+    hourlyChart.brightness.render();
+
+    hourlyChart.tides = (hasTideData && tideChartEl) ? new ApexCharts(tideChartEl, baseChartOptions({
+        chart: { type: 'line' },
+        series: [
+            { name: 'Tide Height (ft, MLLW)', data: tideValues, type: 'area' },
+            { name: 'High Tide', data: tideHighMarkers, type: 'scatter' },
+            { name: 'Low Tide', data: tideLowMarkers, type: 'scatter' }
+        ],
+        colors: ['#06b6d4', '#67e8f9', '#22d3ee'],
+        stroke: { curve: 'smooth', width: [3, 0, 0] },
+        fill: { type: ['gradient', 'solid', 'solid'], opacity: [0.3, 1, 1] },
+        markers: { size: [0, 6, 6], shape: ['circle', 'circle', 'square'] },
+        xaxis: { categories: tideLabels },
+        yaxis: { min: tideYAxisBounds.min, max: tideYAxisBounds.max, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val} ft` } },
+        tooltip: { y: { formatter: (val) => `${Number(val).toFixed(1)} ft` } },
+        annotations: { points: tideAnnotations }
+    })) : null;
+    if (hourlyChart.tides) hourlyChart.tides.render();
 
     // Hide/show precipitation and snow charts based on data
     const hourlyPrecipChartContainer = document.getElementById('hourlyPrecipChart').parentElement;
@@ -4248,16 +4023,14 @@ function openDailyModal(data) {
     const isMobileChartViewport = window.innerWidth <= 768;
     const modalChartAspectRatio = isMobileChartViewport ? 1.2 : 2.2;
 
-    // Hide all chart containers during modal animation so Chart.js doesn't
-    // fire resize events while the slide-in is running (causes Y-axis expansion)
-    modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'none');
+    // Show all chart containers so ApexCharts can measure width
+    modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'block');
 
     // Destroy existing charts if they exist
-    if (dailyChart) {
-        Object.values(dailyChart).forEach(chart => {
-            if (chart) chart.destroy();
-        });
-    }
+    Object.values(dailyChart).forEach(chart => {
+        if (chart) chart.destroy();
+    });
+    dailyChart = {};
 
     // Prepare data
     const labels = [];
@@ -4382,10 +4155,7 @@ function openDailyModal(data) {
         : [];
 
     const hasDailyTideData = dailyTideCurve14d.length >= 2;
-    const dailyTideChartCanvas = document.getElementById('dailyTidesChart');
-    if (dailyTideChartCanvas) {
-        dailyTideChartCanvas.height = 220;
-    }
+    const dailyTideChartEl = document.getElementById('dailyTidesChart');
 
     if (hasDailyTideData) {
         dailyTideCurve14d.forEach((point) => {
@@ -4428,434 +4198,175 @@ function openDailyModal(data) {
     const maxDailyShortwave = Math.max(...dailyShortwaveAverage.filter(v => v !== null && v !== undefined && v > 0), 1);
     const dailyBrightnessData = dailyShortwaveAverage.map(v => v === null || v === undefined ? 0 : Math.round((v / maxDailyShortwave) * 100));
 
-    const dailyTideMarkerLabelPlugin = {
-        id: 'dailyTideMarkerLabelPlugin',
-        afterDatasetsDraw(chart) {
-            if (!chart?.$tideMarkerLabels || chart.$tideMarkerLabels.length === 0) return;
-            const { ctx, scales } = chart;
-            const xScale = scales.x;
-            const yScale = scales.y;
-            ctx.save();
-            ctx.fillStyle = '#67e8f9';
-            ctx.font = '600 10px Inter, sans-serif';
-            ctx.textAlign = 'center';
-
-            chart.$tideMarkerLabels.forEach((point) => {
-                const x = xScale.getPixelForValue(point.index);
-                const y = yScale.getPixelForValue(point.value);
-                ctx.fillText(point.text, x, y - 10);
-            });
-
-            ctx.restore();
-        }
-    };
+    // Build daily tide annotations for H/L markers
+    const dailyTideAnnotations = {};
+    dailyTideMarkerLabels.forEach((point) => {
+        const labelKey = `dailyTideLabel_${point.index}_${point.text}`;
+        dailyTideAnnotations[labelKey] = {
+            x: point.index,
+            y: point.value,
+            borderColor: 'transparent',
+            label: {
+                text: point.text,
+                position: 'top',
+                offsetY: -8,
+                style: {
+                    background: 'transparent',
+                    color: '#67e8f9',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    cssClass: 'apexcharts-tide-label'
+                }
+            }
+        };
+    });
 
     // Create charts
-    const chartConfig = {
-        type: 'line',
-        options: withChartScrubbing({
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: modalChartAspectRatio,
-            plugins: {
-                legend: {
-                    labels: { color: '#fff' }
-                }
-            },
-            scales: {
-                x: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
-                y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
-            }
-        })
-    };
+    dailyChart = {};
 
-    dailyChart = {
-        temp: new Chart(document.getElementById('dailyTempChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: `High (${UNITS.temperature})`,
-                        data: maxTemps,
-                        borderColor: 'rgb(255, 99, 132)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        tension: 0.4
-                    },
-                    {
-                        label: `Low (${UNITS.temperature})`,
-                        data: minTemps,
-                        borderColor: 'rgb(54, 162, 235)',
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        tension: 0.4
-                    }
-                ]
-            }
-        }),
-        feelsLike: new Chart(document.getElementById('dailyFeelsLikeChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: `Feels Like High (${UNITS.temperature})`,
-                        data: apparentMaxTemps,
-                        borderColor: 'rgb(251, 146, 60)',
-                        backgroundColor: 'rgba(251, 146, 60, 0.2)',
-                        tension: 0.4,
-                        spanGaps: true
-                    },
-                    {
-                        label: `Feels Like Low (${UNITS.temperature})`,
-                        data: apparentMinTemps,
-                        borderColor: 'rgb(56, 189, 248)',
-                        backgroundColor: 'rgba(56, 189, 248, 0.2)',
-                        tension: 0.4,
-                        spanGaps: true
-                    }
-                ]
-            }
-        }),
-        niceWeather: new Chart(document.getElementById('dailyNiceWeatherChart'), {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Nice Weather',
-                    data: niceWeatherScores,
-                    borderColor: 'rgb(132, 204, 22)',
-                    backgroundColor: 'rgba(132, 204, 22, 0.25)',
-                    pointBackgroundColor: niceWeatherScores.map(score => {
-                        if (score === null || score === undefined) return 'rgba(148, 163, 184, 0.9)';
-                        if (score >= 8) return 'rgb(34, 197, 94)';
-                        if (score >= 6) return 'rgb(132, 204, 22)';
-                        if (score >= 4) return 'rgb(250, 204, 21)';
-                        return 'rgb(251, 146, 60)';
-                    }),
-                    pointBorderColor: '#ffffff',
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    tension: 0.35,
-                    fill: true,
-                    spanGaps: true
-                }]
-            },
-            options: withChartScrubbing({
-                animation: false,
-                responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: modalChartAspectRatio,
-                plugins: {
-                    legend: {
-                        labels: { color: '#fff' }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => {
-                                const value = context.parsed.y;
-                                return value === null || value === undefined ? 'Nice Weather: unavailable' : `Nice Weather: ${value}/10`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
-                    y: {
-                        min: 0,
-                        max: 10,
-                        ticks: {
-                            color: '#fff',
-                            stepSize: 2,
-                            callback: value => `${value}/10`
-                        },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
-                }
-            })
-        }),
-        precip: new Chart(document.getElementById('dailyPrecipChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: `Precipitation (${UNITS.precipitation})`,
-                    data: precip,
-                    borderColor: 'rgb(54, 162, 235)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    tension: 0.4
-                }]
-            }
-        }),
-        wind: new Chart(document.getElementById('dailyWindChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: `Wind Speed (${UNITS.wind})`,
-                    data: wind,
-                    borderColor: 'rgb(255, 206, 86)',
-                    backgroundColor: 'rgba(255, 206, 86, 0.2)',
-                    tension: 0.4
-                }]
-            }
-        }),
-        pressure: new Chart(document.getElementById('dailyPressureChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Pressure (inHg)',
-                    data: dailyPressure,
-                    borderColor: 'rgb(34, 197, 94)',
-                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                    tension: 0.4
-                }]
-            }
-        }),
-        snow: new Chart(document.getElementById('dailySnowChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: `Snowfall (${UNITS.snowfall})`,
-                    data: snowfall,
-                    borderColor: 'rgb(173, 216, 230)',
-                    backgroundColor: 'rgba(173, 216, 230, 0.3)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            }
-        }),
-        cloud: new Chart(document.getElementById('dailyCloudChart'), {
-            type: 'bar',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: 'Low Clouds',
-                        data: dailyCloudLow,
-                        backgroundColor: 'rgba(100, 116, 139, 0.75)',
-                        stack: 'cloud'
-                    },
-                    {
-                        label: 'Mid Clouds',
-                        data: dailyCloudMid,
-                        backgroundColor: 'rgba(148, 163, 184, 0.7)',
-                        stack: 'cloud'
-                    },
-                    {
-                        label: 'High Clouds',
-                        data: dailyCloudHigh,
-                        backgroundColor: 'rgba(203, 213, 225, 0.65)',
-                        stack: 'cloud'
-                    }
-                ]
-            },
-            options: withChartScrubbing({
-                animation: false,
-                responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: modalChartAspectRatio,
-                plugins: {
-                    legend: {
-                        labels: { color: '#fff' }
-                    }
-                },
-                scales: {
-                    x: {
-                        stacked: true,
-                        ticks: { color: '#fff' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    },
-                    y: {
-                        stacked: true,
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            color: '#fff',
-                            callback: value => `${value}%`
-                        },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
-                }
-            })
-        }),
-        brightness: new Chart(document.getElementById('dailyBrightnessChart'), {
-            type: 'line',
-            options: withChartScrubbing({
-                responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: modalChartAspectRatio,
-                plugins: {
-                    legend: {
-                        labels: { color: '#fff' }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: '#fff' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    },
-                    y: {
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            color: '#fff',
-                            callback: value => value + '%'
-                        },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
-                }
-            }),
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Brightness (%)',
-                    data: dailyBrightnessData,
-                    borderColor: 'rgb(250, 204, 21)',
-                    backgroundColor: 'rgba(250, 204, 21, 0.2)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            }
-        }),
-        tides: (hasDailyTideData && dailyTideChartCanvas) ? new Chart(dailyTideChartCanvas, {
-            type: 'line',
-            data: {
-                labels: dailyTideLabels,
-                datasets: [
-                    {
-                        label: 'Tide Height (ft, MLLW)',
-                        data: dailyTideValues,
-                        borderColor: '#06b6d4',
-                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
-                        tension: 0.45,
-                        fill: true,
-                        pointRadius: 0
-                    },
-                    {
-                        label: 'High Tide',
-                        data: dailyTideHighMarkers,
-                        borderColor: '#67e8f9',
-                        backgroundColor: '#67e8f9',
-                        pointRadius: 3,
-                        pointHoverRadius: 4,
-                        pointStyle: 'circle',
-                        showLine: false
-                    },
-                    {
-                        label: 'Low Tide',
-                        data: dailyTideLowMarkers,
-                        borderColor: '#22d3ee',
-                        backgroundColor: '#22d3ee',
-                        pointRadius: 3,
-                        pointHoverRadius: 4,
-                        pointStyle: 'rectRot',
-                        showLine: false
-                    }
-                ]
-            },
-            options: withChartScrubbing({
-                animation: {
-                    duration: 0
-                },
-                responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: modalChartAspectRatio,
-                plugins: {
-                    legend: {
-                        labels: { color: '#fff' }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            title: (items) => {
-                                if (!items || items.length === 0) return '';
-                                const idx = items[0].dataIndex;
-                                return dailyTideCurve14d[idx]?.time?.toLocaleString('en-US', {
-                                    weekday: 'short',
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: 'numeric',
-                                    minute: '2-digit'
-                                }) || items[0].label;
-                            },
-                            label: (context) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} ft`
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            color: '#fff',
-                            autoSkip: true,
-                            maxTicksLimit: 14
-                        },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    },
-                    y: {
-                        beginAtZero: false,
-                        min: dailyTideYAxisBounds.min,
-                        max: dailyTideYAxisBounds.max,
-                        ticks: {
-                            color: '#fff',
-                            callback: (value) => `${value} ft`
-                        },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
-                }
-            }),
-            plugins: [dailyTideMarkerLabelPlugin]
-        }) : null,
-        moonPhase: new Chart(document.getElementById('dailyMoonPhaseChart'), {
-            ...chartConfig,
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Moon Phase',
-                    data: moonPhases,
-                    borderColor: 'rgb(147, 112, 219)',
-                    backgroundColor: 'rgba(147, 112, 219, 0.2)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: withChartScrubbing({
-                ...chartConfig.options,
-                scales: {
-                    ...chartConfig.options.scales,
-                    y: {
-                        ...chartConfig.options.scales.y,
-                        min: 0,
-                        max: 1,
-                        ticks: {
-                            ...chartConfig.options.scales.y.ticks,
-                            stepSize: 0.125,
-                            callback: function(value) {
-                                const phase = getMoonPhase(value);
-                                return phase.emoji;
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    ...chartConfig.options.plugins,
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const phase = getMoonPhase(context.parsed.y);
-                                return `Moon Phase: ${phase.emoji} ${phase.name} (${(context.parsed.y * 100).toFixed(1)}%)`;
-                            }
-                        }
-                    }
-                }
-            })
-        })
-    };
+    dailyChart.temp = new ApexCharts(document.getElementById('dailyTempChart'), baseChartOptions({
+        series: [
+            { name: `High (${UNITS.temperature})`, data: maxTemps },
+            { name: `Low (${UNITS.temperature})`, data: minTemps }
+        ],
+        colors: ['rgb(255, 99, 132)', 'rgb(54, 162, 235)'],
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "°F", style: { color: "#fff" } } }
+    }));
+    dailyChart.temp.render();
 
-    if (dailyChart.tides) {
-        dailyChart.tides.$tideMarkerLabels = dailyTideMarkerLabels;
-    }
+    dailyChart.feelsLike = new ApexCharts(document.getElementById('dailyFeelsLikeChart'), baseChartOptions({
+        series: [
+            { name: `Feels Like High (${UNITS.temperature})`, data: apparentMaxTemps },
+            { name: `Feels Like Low (${UNITS.temperature})`, data: apparentMinTemps }
+        ],
+        colors: ['rgb(251, 146, 60)', 'rgb(56, 189, 248)'],
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "°F", style: { color: "#fff" } } }
+    }));
+    dailyChart.feelsLike.render();
+
+    // Nice weather chart with custom point colors
+    const niceWeatherPointColors = niceWeatherScores.map(score => {
+        if (score === null || score === undefined) return 'rgba(148, 163, 184, 0.9)';
+        if (score >= 8) return 'rgb(34, 197, 94)';
+        if (score >= 6) return 'rgb(132, 204, 22)';
+        if (score >= 4) return 'rgb(250, 204, 21)';
+        return 'rgb(251, 146, 60)';
+    });
+    dailyChart.niceWeather = new ApexCharts(document.getElementById('dailyNiceWeatherChart'), baseChartOptions({
+        series: [{ name: 'Nice Weather', data: niceWeatherScores }],
+        colors: ['rgb(132, 204, 22)'],
+        
+        
+        markers: { size: 4, colors: niceWeatherPointColors, strokeColors: '#fff', strokeWidth: 1 },
+        xaxis: { categories: labels },
+        yaxis: { min: 0, max: 10, tickAmount: 5, title: { text: '/10', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val}/10` } },
+        tooltip: { y: { formatter: (val) => (val === null || val === undefined ? 'Nice Weather: unavailable' : `Nice Weather: ${val}/10`) } }
+    }));
+    dailyChart.niceWeather.render();
+
+    dailyChart.precip = new ApexCharts(document.getElementById('dailyPrecipChart'), baseChartOptions({
+        series: [{ name: `Precipitation (${UNITS.precipitation})`, data: precip }],
+        colors: ['rgb(54, 162, 235)'],
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "inches", style: { color: "#fff" } } }
+    }));
+    dailyChart.precip.render();
+
+    dailyChart.wind = new ApexCharts(document.getElementById('dailyWindChart'), baseChartOptions({
+        series: [{ name: `Wind Speed (${UNITS.wind})`, data: wind }],
+        colors: ['rgb(255, 206, 86)'],
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "mph", style: { color: "#fff" } } }
+    }));
+    dailyChart.wind.render();
+
+    dailyChart.pressure = new ApexCharts(document.getElementById('dailyPressureChart'), baseChartOptions({
+        series: [{ name: 'Pressure (inHg)', data: dailyPressure }],
+        colors: ['rgb(34, 197, 94)'],
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "inHg", style: { color: "#fff" } } }
+    }));
+    dailyChart.pressure.render();
+
+    dailyChart.snow = new ApexCharts(document.getElementById('dailySnowChart'), baseChartOptions({
+        series: [{ name: `Snowfall (${UNITS.snowfall})`, data: snowfall }],
+        colors: ['rgb(173, 216, 230)'],
+        
+        
+        xaxis: { categories: labels },
+        yaxis: { title: { text: "inches", style: { color: "#fff" } } }
+    }));
+    dailyChart.snow.render();
+
+    dailyChart.cloud = new ApexCharts(document.getElementById('dailyCloudChart'), baseChartOptions({
+        chart: { type: 'bar', stacked: true },
+        series: [
+            { name: 'Low Clouds', data: dailyCloudLow },
+            { name: 'Mid Clouds', data: dailyCloudMid },
+            { name: 'High Clouds', data: dailyCloudHigh }
+        ],
+        colors: ['rgba(100, 116, 139, 0.75)', 'rgba(148, 163, 184, 0.7)', 'rgba(203, 213, 225, 0.65)'],
+        fill: { type: 'solid' },
+        plotOptions: { bar: { borderRadius: 2 } },
+        xaxis: { categories: labels },
+        yaxis: { min: 0, max: 100, title: { text: '%', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val}%` } }
+    }));
+    dailyChart.cloud.render();
+
+    dailyChart.brightness = new ApexCharts(document.getElementById('dailyBrightnessChart'), baseChartOptions({
+        series: [{ name: 'Brightness (%)', data: dailyBrightnessData }],
+        colors: ['rgb(250, 204, 21)'],
+        
+        
+        xaxis: { categories: labels },
+        yaxis: { min: 0, max: 100, title: { text: '%', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val}%` } }
+    }));
+    dailyChart.brightness.render();
+
+    dailyChart.tides = (hasDailyTideData && dailyTideChartEl) ? new ApexCharts(dailyTideChartEl, baseChartOptions({
+        chart: { type: 'line' },
+        series: [
+            { name: 'Tide Height (ft, MLLW)', data: dailyTideValues, type: 'area' },
+            { name: 'High Tide', data: dailyTideHighMarkers, type: 'scatter' },
+            { name: 'Low Tide', data: dailyTideLowMarkers, type: 'scatter' }
+        ],
+        colors: ['#06b6d4', '#67e8f9', '#22d3ee'],
+        stroke: { curve: 'smooth', width: [3, 0, 0] },
+        fill: { type: ['gradient', 'solid', 'solid'], opacity: [0.3, 1, 1] },
+        markers: { size: [0, 6, 6], shape: ['circle', 'circle', 'square'] },
+        xaxis: { categories: dailyTideLabels, tickAmount: 14 },
+        yaxis: { min: dailyTideYAxisBounds.min, max: dailyTideYAxisBounds.max, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val} ft` } },
+        tooltip: {
+            x: { formatter: (_val, opts) => {
+                const idx = opts?.dataPointIndex;
+                return dailyTideCurve14d[idx]?.time?.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) || '';
+            }},
+            y: { formatter: (val) => `${Number(val).toFixed(1)} ft` }
+        },
+        annotations: { points: dailyTideAnnotations }
+    })) : null;
+    if (dailyChart.tides) dailyChart.tides.render();
+
+    dailyChart.moonPhase = new ApexCharts(document.getElementById('dailyMoonPhaseChart'), baseChartOptions({
+        series: [{ name: 'Moon Phase', data: moonPhases }],
+        colors: ['rgb(147, 112, 219)'],
+        
+        
+        xaxis: { categories: labels },
+        yaxis: {
+            min: 0, max: 1, tickAmount: 8,
+            labels: { style: { colors: '#fff' }, formatter: (val) => getMoonPhase(val).emoji }
+        },
+        tooltip: { y: { formatter: (val) => { const phase = getMoonPhase(val); return `Moon Phase: ${phase.emoji} ${phase.name} (${(val * 100).toFixed(1)}%)`; } } }
+    }));
+    dailyChart.moonPhase.render();
 
     // Hide/show charts based on rain and snow presence
     const snowChartContainer = document.getElementById('dailySnowChart').parentElement;
