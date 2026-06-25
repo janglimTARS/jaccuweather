@@ -542,9 +542,10 @@
             }
 
             /* Mobile: reduce chart container padding to maximize chart width */
+            /* pan-y allows vertical scroll but lets chart capture horizontal drag for scrubbing */
             .chart-container {
                 padding: 0.5rem !important;
-                touch-action: manipulation;
+                touch-action: pan-y;
             }
         }
 

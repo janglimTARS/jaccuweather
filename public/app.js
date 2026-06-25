@@ -87,7 +87,13 @@ function baseChartOptions(overrides = {}) {
         },
         markers: { size: 0, hover: { size: 5 } },
         dataLabels: { enabled: false },
-        tooltip: { theme: 'dark' },
+        tooltip: {
+            theme: 'dark',
+            // Mobile: tooltip follows finger during drag-scrub
+            followCursor: isMobile,
+            // Mobile: pin tooltip to top so it stays visible while scrubbing
+            fixed: { enabled: isMobile, position: 'topRight', offsetX: 0, offsetY: 0 },
+        },
         xaxis: {
             categories: xaxisCategories || [],
             tickAmount: xaxisTickAmount || baseTickAmount,
@@ -110,6 +116,12 @@ function baseChartOptions(overrides = {}) {
     merged.chart = {
         ...opts.chart,
         ...overrides.chart,
+    };
+
+    // Re-apply tooltip so mobile followCursor/fixed survive override clobbering
+    merged.tooltip = {
+        ...opts.tooltip,
+        ...overrides.tooltip,
     };
 
     // Re-apply xaxis/yaxis so base label settings survive override clobbering
