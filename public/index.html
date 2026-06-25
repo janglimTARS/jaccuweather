@@ -37,7 +37,7 @@
             }
         }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@4.7.0/dist/apexcharts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -537,7 +537,7 @@
                 border-radius: 0 0 0.75rem 0.75rem;
             }
 
-            .chart-container canvas {
+            .chart-container .apexcharts-canvas {
                 min-height: 250px;
             }
         }
@@ -956,33 +956,33 @@
             </div>
             <div class="space-y-6">
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="temp">
-                    <canvas id="hourlyTempChart" style="height: 250px;"></canvas>
+                    <div id="hourlyTempChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="precip">
-                    <canvas id="hourlyPrecipChart" style="height: 250px;"></canvas>
+                    <div id="hourlyPrecipChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="wind">
-                    <canvas id="hourlyWindChart" style="height: 250px;"></canvas>
+                    <div id="hourlyWindChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="humidity">
-                    <canvas id="hourlyHumidityChart" style="height: 250px;"></canvas>
+                    <div id="hourlyHumidityChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="pressure">
-                    <canvas id="hourlyPressureChart" style="height: 250px;"></canvas>
+                    <div id="hourlyPressureChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="snow">
-                    <canvas id="hourlySnowChart" style="height: 250px;"></canvas>
+                    <div id="hourlySnowChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="cloud">
-                    <canvas id="hourlyCloudChart" style="height: 250px;"></canvas>
+                    <div id="hourlyCloudChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="brightness">
-                    <canvas id="hourlyBrightnessChart" style="height: 250px;"></canvas>
+                    <div id="hourlyBrightnessChart" style="height: 250px;"></div>
                 </div>
                 <div id="hourlyTidesChartContainer" class="card rounded-xl p-4 chart-container" data-chart-type="tides" data-feature-hidden="true">
                     <div class="mb-2 text-cyan-100 font-semibold">NOAA Tide Height (48h)</div>
                     <div id="hourlyTidesSubtitle" class="mb-3 text-cyan-200/80 text-sm"></div>
-                    <canvas id="hourlyTidesChart" style="height: 250px;"></canvas>
+                    <div id="hourlyTidesChart" style="height: 250px;"></div>
                 </div>
                 <div id="hourlyDetails" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Detailed hourly items will be inserted here -->
@@ -1022,41 +1022,41 @@
             </div>
             <div class="space-y-6">
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="temp">
-                    <canvas id="dailyTempChart" style="height: 250px;"></canvas>
+                    <div id="dailyTempChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="feelslike">
-                    <canvas id="dailyFeelsLikeChart" style="height: 250px;"></canvas>
+                    <div id="dailyFeelsLikeChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="niceweather">
                     <div class="mb-2 text-sm font-semibold text-lime-100">14-Day Nice Weather Index</div>
                     <div class="mb-3 text-lime-200/80 text-sm">Higher scores mean more comfortable outdoor weather.</div>
-                    <canvas id="dailyNiceWeatherChart" style="height: 250px;"></canvas>
+                    <div id="dailyNiceWeatherChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="precip">
-                    <canvas id="dailyPrecipChart" style="height: 250px;"></canvas>
+                    <div id="dailyPrecipChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="wind">
-                    <canvas id="dailyWindChart" style="height: 250px;"></canvas>
+                    <div id="dailyWindChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="pressure">
-                    <canvas id="dailyPressureChart" style="height: 250px;"></canvas>
+                    <div id="dailyPressureChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="snow">
-                    <canvas id="dailySnowChart" style="height: 250px;"></canvas>
+                    <div id="dailySnowChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="cloud">
-                    <canvas id="dailyCloudChart" style="height: 250px;"></canvas>
+                    <div id="dailyCloudChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="brightness">
-                    <canvas id="dailyBrightnessChart" style="height: 250px;"></canvas>
+                    <div id="dailyBrightnessChart" style="height: 250px;"></div>
                 </div>
                 <div id="dailyTidesChartContainer" class="card rounded-xl p-4 chart-container" data-chart-type="tides" data-feature-hidden="true">
                     <div class="mb-2 text-sm font-semibold text-cyan-100">14-Day Tide Forecast</div>
                     <div id="dailyTidesSubtitle" class="mb-3 text-cyan-200/80 text-sm"></div>
-                    <canvas id="dailyTidesChart" style="height: 250px;"></canvas>
+                    <div id="dailyTidesChart" style="height: 250px;"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="moon">
-                    <canvas id="dailyMoonPhaseChart" style="height: 250px;"></canvas>
+                    <div id="dailyMoonPhaseChart" style="height: 250px;"></div>
                 </div>
                 <div id="dailyDetails" class="space-y-3">
                     <!-- Detailed daily items will be inserted here -->
