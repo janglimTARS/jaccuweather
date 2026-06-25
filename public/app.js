@@ -46,15 +46,30 @@ function baseChartOptions(overrides = {}) {
     const xaxisCategories = overrides.xaxis?.categories;
     const xaxisTickAmount = overrides.xaxis?.tickAmount;
 
+    // Mobile-specific chart optimizations
+    // Docs: https://apexcharts.com/docs/options/chart/
+    const isMobile = window.innerWidth <= 768;
+    const baseTickAmount = isMobile ? 4 : 6;
+    const baseChartHeight = isMobile ? 200 : 250;
+
     const opts = {
         chart: {
             type: 'area',
             background: 'transparent',
             foreColor: '#fff',
             toolbar: { show: false },
-            animations: { enabled: true, easing: 'easeinout', speed: 600 },
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 600,
+                // Mobile: disable one-by-one gradual animation (48 pts * 150ms delay = 7.2s)
+                animateGradually: { enabled: !isMobile },
+            },
             fontFamily: 'inherit',
-            height: 250,
+            height: baseChartHeight,
+            // Mobile: disable zoom — drag-to-zoom hijacks touch scrolling
+            // Docs: chart.zoom.enabled defaults to true
+            zoom: { enabled: !isMobile },
             ...overrides.chart
         },
         theme: { mode: 'dark' },
@@ -75,7 +90,7 @@ function baseChartOptions(overrides = {}) {
         tooltip: { theme: 'dark' },
         xaxis: {
             categories: xaxisCategories || [],
-            tickAmount: xaxisTickAmount || 6,
+            tickAmount: xaxisTickAmount || baseTickAmount,
             labels: {
                 style: { colors: '#fff', fontSize: '11px' },
                 rotate: -40,
@@ -91,10 +106,16 @@ function baseChartOptions(overrides = {}) {
     // Merge overrides on top, but preserve xaxis/yaxis base settings
     const merged = { ...opts, ...overrides };
 
+    // Re-apply chart so toolbar/animations/zoom survive override clobbering
+    merged.chart = {
+        ...opts.chart,
+        ...overrides.chart,
+    };
+
     // Re-apply xaxis/yaxis so base label settings survive override clobbering
     merged.xaxis = {
         categories: xaxisCategories || overrides.xaxis?.categories || [],
-        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || 6,
+        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || baseTickAmount,
         labels: {
             style: { colors: '#fff', fontSize: '11px' },
             rotate: -40,
@@ -104,7 +125,7 @@ function baseChartOptions(overrides = {}) {
         },
         ...overrides.xaxis,
         categories: xaxisCategories || overrides.xaxis?.categories || [],
-        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || 6,
+        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || baseTickAmount,
     };
 
     merged.yaxis = {
@@ -3712,9 +3733,6 @@ function openHourlyModal(data) {
     modal.classList.add('active');
     setHourlyTidesVisibility(currentTideData);
 
-    const isMobileChartViewport = window.innerWidth <= 768;
-    const modalChartAspectRatio = isMobileChartViewport ? 1.2 : 2.2;
-
     // Show all chart containers so ApexCharts can measure width
     modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'block');
 
@@ -4019,9 +4037,6 @@ function openDailyModal(data) {
     const modal = document.getElementById('dailyModal');
     modal.classList.add('active');
     setDailyTidesVisibility(currentTideData);
-
-    const isMobileChartViewport = window.innerWidth <= 768;
-    const modalChartAspectRatio = isMobileChartViewport ? 1.2 : 2.2;
 
     // Show all chart containers so ApexCharts can measure width
     modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'block');
