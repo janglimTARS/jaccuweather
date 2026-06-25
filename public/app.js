@@ -88,8 +88,14 @@ function baseChartOptions(overrides = {}) {
         },
     };
 
-    // Merge overrides on top, but preserve xaxis/yaxis base settings
+    // Merge overrides on top, but preserve base chart/xaxis/yaxis settings
     const merged = { ...opts, ...overrides };
+
+    // Re-apply chart so toolbar/animations/etc survive override clobbering
+    merged.chart = {
+        ...opts.chart,
+        ...overrides.chart,
+    };
 
     // Re-apply xaxis/yaxis so base label settings survive override clobbering
     merged.xaxis = {
