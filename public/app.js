@@ -1744,7 +1744,7 @@ async function fetchWeather(lat, lon) {
 
     try {
         // Make direct request to Open-Meteo ensemble endpoint from browser (uses user's IP, not shared Cloudflare IP)
-        const weatherResponse = await fetch(`https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lon}&models=icon_seamless,gfs_seamless,ecmwf_ifs025&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation,snowfall,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,shortwave_radiation,is_day,apparent_temperature,dew_point_2m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
+        const weatherResponse = await fetch(`https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lon}&models=icon_seamless,gfs_seamless,ecmwf_ifs025&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability,precipitation,snowfall,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,shortwave_radiation,is_day,apparent_temperature,dew_point_2m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max,wind_direction_10m_dominant,wind_gusts_10m_max,precipitation_probability_max,snowfall_sum,sunrise,sunset&forecast_days=14&past_days=2&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto`);
 
         // Check for rate limiting before parsing JSON
         if (weatherResponse.status === 429) {
@@ -1996,9 +1996,19 @@ function displayWeather(data) {
     // Precipitation timing
     displayPrecipitationTiming(data);
 
-    // Hourly forecast
-    const hourlyContainer = document.getElementById('hourlyForecast').querySelector('.flex');
+    // Hourly forecast — conditions view
+    const hourlyContainer = document.getElementById('hourlyViewConditions').querySelector('.flex');
     hourlyContainer.innerHTML = '';
+    // Hourly forecast — precipitation view
+    const precipContainer = document.getElementById('hourlyPrecipContainer');
+    precipContainer.innerHTML = '';
+    // Hourly forecast — wind view
+    const windContainer = document.getElementById('hourlyWindContainer');
+    windContainer.innerHTML = '';
+
+    // Find max precipitation for scaling bars
+    let maxPrecip = 0;
+
     const now = new Date();
     const currentHour = now.getHours();
 
@@ -2024,11 +2034,22 @@ function displayWeather(data) {
         }
     }
 
+    // First pass: find max precipitation for scaling
+    for (let i = 0; i < HOURLY_FORECAST_HOURS && (startIndex + i) < data.hourly.time.length; i++) {
+        const hourIndex = startIndex + i;
+        const p = data.hourly.precipitation ? (data.hourly.precipitation[hourIndex] || 0) : 0;
+        if (p > maxPrecip) maxPrecip = p;
+    }
+    // Avoid division by zero
+    const precipScale = maxPrecip > 0 ? maxPrecip : 1;
+
     for (let i = 0; i < HOURLY_FORECAST_HOURS && (startIndex + i) < data.hourly.time.length; i++) {
         const hourIndex = startIndex + i;
         const hour = new Date(data.hourly.time[hourIndex]);
+
+        // ── Conditions view (existing) ──
         const hourItem = document.createElement('div');
-        hourItem.className = 'flex flex-col items-center forecast-chip rounded-lg p-3 backdrop-blur-sm min-w-[80px] clickable';
+        hourItem.className = 'flex flex-col items-center forecast-chip hourly-chip rounded-lg p-3 backdrop-blur-sm clickable';
         hourItem.innerHTML = `
             <div class="text-white/70 text-sm mb-1">${formatTime12Hour(hour)}</div>
             <div class="text-2xl mb-2">${getWeatherIcon(data.hourly.weather_code[hourIndex], data.hourly.is_day ? data.hourly.is_day[hourIndex] !== 0 : true)}</div>
@@ -2037,7 +2058,81 @@ function displayWeather(data) {
         `;
         hourItem.addEventListener('click', () => openHourlyModal(data));
         hourlyContainer.appendChild(hourItem);
+
+        // ── Precipitation view ──
+        const precipVal = data.hourly.precipitation ? (data.hourly.precipitation[hourIndex] || 0) : 0;
+        const precipProb = data.hourly.precipitation_probability ? (data.hourly.precipitation_probability[hourIndex] ?? 0) : 0;
+        const barHeight = precipVal > 0 ? Math.max(4, (precipVal / precipScale) * 40) : 2;
+        const precipItem = document.createElement('div');
+        precipItem.className = 'flex flex-col items-center forecast-chip hourly-chip rounded-lg p-3 backdrop-blur-sm clickable';
+        precipItem.innerHTML = `
+            <div class="text-white/70 text-sm mb-1">${formatTime12Hour(hour)}</div>
+            <div class="hourly-precip-bar-container">
+                <div class="hourly-precip-bar ${precipVal === 0 ? 'zero' : ''}" style="height: ${barHeight}px"></div>
+            </div>
+            <div class="text-white font-bold text-sm mt-1">${precipVal > 0 ? precipVal.toFixed(2) + '"' : '0"'}</div>
+            <div class="text-white/60 text-xs mt-1">${precipProb}%</div>
+        `;
+        precipItem.addEventListener('click', () => openHourlyModal(data));
+        precipContainer.appendChild(precipItem);
+
+        // ── Wind view ──
+        const windSpeed = data.hourly.wind_speed_10m[hourIndex] || 0;
+        const windGust = data.hourly.wind_gusts_10m ? (data.hourly.wind_gusts_10m[hourIndex] || 0) : null;
+        const windDir = data.hourly.wind_direction_10m ? (data.hourly.wind_direction_10m[hourIndex] ?? 0) : 0;
+        // Wind direction arrow: CSS rotation. Arrow points FROM the direction the wind blows.
+        // wind_direction_10m is meteorological: direction FROM which wind blows. Arrow should point opposite.
+        const arrowRotation = windDir + 180;
+        const windItem = document.createElement('div');
+        windItem.className = 'flex flex-col items-center forecast-chip hourly-chip rounded-lg p-3 backdrop-blur-sm clickable';
+        windItem.innerHTML = `
+            <div class="text-white/70 text-sm mb-1">${formatTime12Hour(hour)}</div>
+            <div class="wind-arrow" style="transform: rotate(${arrowRotation}deg)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5"/>
+                    <polyline points="5 12 12 5 19 12"/>
+                </svg>
+            </div>
+            <div class="text-white font-bold text-lg mt-1">${Math.round(windSpeed)}</div>
+            <div class="text-white/60 text-xs mt-1">${UNITS.wind}${windGust !== null ? ' G' + Math.round(windGust) : ''}</div>
+        `;
+        windItem.addEventListener('click', () => openHourlyModal(data));
+        windContainer.appendChild(windItem);
     }
+
+    // Wire up toggle buttons
+    const toggleBtns = document.querySelectorAll('#hourlyHighlightsToggle .highlights-toggle-btn');
+    const toggleLabel = document.getElementById('hourlyToggleLabel');
+    const viewIds = {
+        conditions: 'hourlyViewConditions',
+        precipitation: 'hourlyViewPrecipitation',
+        wind: 'hourlyViewWind',
+    };
+    const labelMap = {
+        conditions: 'Conditions',
+        precipitation: 'Precipitation',
+        wind: 'Wind',
+    };
+    toggleBtns.forEach(btn => {
+        // Remove any previous listener by cloning
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', () => {
+            const mode = newBtn.getAttribute('data-mode');
+            // Update button active states
+            document.querySelectorAll('#hourlyHighlightsToggle .highlights-toggle-btn').forEach(b => b.classList.remove('active'));
+            newBtn.classList.add('active');
+            // Update label
+            toggleLabel.textContent = labelMap[mode] || mode;
+            toggleLabel.classList.add('active');
+            // Show correct view, hide others
+            Object.entries(viewIds).forEach(([m, id]) => {
+                const el = document.getElementById(id);
+                if (m === mode) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+        });
+    });
 
     // Daily forecast
     const dailyContainer = document.getElementById('dailyForecast');
@@ -2064,7 +2159,7 @@ function displayWeather(data) {
         dayItem.innerHTML = `
             <div class="daily-forecast-main">
                 <div class="daily-forecast-date">
-                    <div class="daily-forecast-icon text-3xl">${getDailyForecastIcon(data, dayIndex)}</div>
+                    <div class="daily-forecast-icon text-3xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
                     <div class="min-w-0">
                         <div class="daily-forecast-day text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: weekdayFormat })}</div>
                         <div class="daily-forecast-date-label text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
@@ -2240,55 +2335,6 @@ async function displayWeeklySnowTotals(data) {
     } catch (error) {
         console.error('NWS weekly snow line error:', error);
     }
-}
-
-function getDailyForecastIcon(data, dayIndex) {
-    const dateKey = data?.daily?.time?.[dayIndex];
-    const hourly = data?.hourly;
-    if (!dateKey || !hourly?.time?.length) {
-        return getWeatherIcon(data?.daily?.weather_code?.[dayIndex], true, data?.daily?.precipitation_probability_max?.[dayIndex] ?? null);
-    }
-
-    const todayKey = formatDateKey(new Date());
-    if (dateKey === todayKey && data?.current?.weather_code !== null && data?.current?.weather_code !== undefined) {
-        return getWeatherIcon(data.current.weather_code, data.current.is_day !== 0, data?.current?.precipitation_probability ?? null);
-    }
-
-    const daylightIndexes = [];
-    const fallbackDaytimeIndexes = [];
-    for (let i = 0; i < hourly.time.length; i++) {
-        if (!hourly.time[i]?.startsWith(`${dateKey}T`)) continue;
-        const hour = Number(hourly.time[i].slice(11, 13));
-        if (hour >= 6 && hour <= 18) fallbackDaytimeIndexes.push(i);
-        if (!hourly.is_day || hourly.is_day[i] !== 0) daylightIndexes.push(i);
-    }
-
-    const indexes = daylightIndexes.length ? daylightIndexes : fallbackDaytimeIndexes;
-    if (!indexes.length) {
-        return getWeatherIcon(data?.daily?.weather_code?.[dayIndex], true, data?.daily?.precipitation_probability_max?.[dayIndex] ?? null);
-    }
-
-    const precipCodes = new Set([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99]);
-    const meaningfulPrecip = indexes
-        .filter((idx) => precipCodes.has(hourly.weather_code?.[idx]) && (hourly.precipitation_probability?.[idx] ?? data?.daily?.precipitation_probability_max?.[dayIndex] ?? 0) > 30)
-        .sort((a, b) => (hourly.precipitation_probability?.[b] ?? 0) - (hourly.precipitation_probability?.[a] ?? 0));
-    if (meaningfulPrecip.length) {
-        return getWeatherIcon(hourly.weather_code[meaningfulPrecip[0]], true, hourly.precipitation_probability?.[meaningfulPrecip[0]] ?? null);
-    }
-
-    const bestDaylightIndex = indexes.reduce((bestIdx, idx) => {
-        const radiation = hourly.shortwave_radiation?.[idx];
-        const bestRadiation = hourly.shortwave_radiation?.[bestIdx];
-        if (Number.isFinite(radiation) && (!Number.isFinite(bestRadiation) || radiation > bestRadiation)) return idx;
-        if (!Number.isFinite(radiation) && !Number.isFinite(bestRadiation)) {
-            const hour = Number(hourly.time[idx].slice(11, 13));
-            const bestHour = Number(hourly.time[bestIdx].slice(11, 13));
-            return Math.abs(hour - 12) < Math.abs(bestHour - 12) ? idx : bestIdx;
-        }
-        return bestIdx;
-    }, indexes[0]);
-
-    return getWeatherIcon(hourly.weather_code?.[bestDaylightIndex] ?? data?.daily?.weather_code?.[dayIndex], true, hourly.precipitation_probability?.[bestDaylightIndex] ?? null);
 }
 
 function getWeatherIcon(code, isDay = true, precipProbability = null) {
@@ -4848,7 +4894,7 @@ function openDailyModal(data) {
                     <div class="text-white font-semibold text-lg">${day.toLocaleDateString('en-US', { weekday: 'long' })}</div>
                     <div class="text-white/70 text-sm">${day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
                 </div>
-                <div class="text-4xl">${getDailyForecastIcon(data, dayIndex)}</div>
+                <div class="text-4xl">${getWeatherIcon(data.daily.weather_code[dayIndex], true, data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[dayIndex] : null)}</div>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div class="bg-white/10 rounded p-3">
