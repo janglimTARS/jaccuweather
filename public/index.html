@@ -538,7 +538,13 @@
             }
 
             .chart-container .apexcharts-canvas {
-                min-height: 250px;
+                min-height: 200px;
+            }
+
+            /* Mobile: reduce chart container padding to maximize chart width */
+            .chart-container {
+                padding: 0.5rem !important;
+                touch-action: manipulation;
             }
         }
 
