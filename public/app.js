@@ -50,7 +50,7 @@ function baseChartOptions(overrides = {}) {
     // Docs: https://apexcharts.com/docs/options/chart/
     const isMobile = window.innerWidth <= 768;
     const baseTickAmount = isMobile ? 4 : 6;
-    const baseChartHeight = isMobile ? 200 : 250;
+    const baseChartHeight = isMobile ? 200 : 300;
 
     const opts = {
         chart: {
@@ -75,7 +75,7 @@ function baseChartOptions(overrides = {}) {
         theme: { mode: 'dark' },
         grid: { borderColor: 'rgba(255,255,255,0.08)', strokeDashArray: 3 },
         legend: { show: true, position: 'top', labels: { colors: '#fff' }, fontSize: '13px' },
-        stroke: { curve: 'smooth', width: 3, lineCap: 'round' },
+        stroke: { curve: 'monotoneCubic', width: 3, lineCap: 'round' },
         fill: {
             type: 'gradient',
             gradient: {
@@ -3997,7 +3997,7 @@ function openHourlyModal(data) {
             { name: 'Low Tide', data: tideLowMarkers, type: 'scatter' }
         ],
         colors: ['#06b6d4', '#67e8f9', '#22d3ee'],
-        stroke: { curve: 'smooth', width: [3, 0, 0] },
+        stroke: { curve: 'monotoneCubic', width: [3, 0, 0] },
         fill: { type: ['gradient', 'solid', 'solid'], opacity: [0.3, 1, 1] },
         markers: { size: [0, 6, 6], shape: ['circle', 'circle', 'square'] },
         xaxis: { categories: tideLabels },
@@ -4371,7 +4371,7 @@ function openDailyModal(data) {
             { name: 'Low Tide', data: dailyTideLowMarkers, type: 'scatter' }
         ],
         colors: ['#06b6d4', '#67e8f9', '#22d3ee'],
-        stroke: { curve: 'smooth', width: [3, 0, 0] },
+        stroke: { curve: 'monotoneCubic', width: [3, 0, 0] },
         fill: { type: ['gradient', 'solid', 'solid'], opacity: [0.3, 1, 1] },
         markers: { size: [0, 6, 6], shape: ['circle', 'circle', 'square'] },
         xaxis: { categories: dailyTideLabels, tickAmount: 14 },
