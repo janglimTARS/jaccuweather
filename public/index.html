@@ -31,7 +31,7 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        sans: ['Geist', 'system-ui', 'sans-serif'],
                     }
                 }
             }
@@ -44,29 +44,39 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.wms@0.2.0/dist/leaflet.wms.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
 
         :root {
-            --sky-ink: #07111f;
-            --sky-deep: #0d1b2e;
-            --sky-mid: #12385f;
-            --glass-border: rgba(148, 163, 184, 0.2);
+            --sky-ink: #060f1c;
+            --sky-deep: #0b1828;
+            --sky-mid: #102842;
+            --glass-border: rgba(148, 163, 184, 0.18);
+            --glass-highlight: rgba(255, 255, 255, 0.08);
             --accent: #38bdf8;
+            --accent-dim: rgba(56, 189, 248, 0.12);
+            --accent-glow: rgba(56, 189, 248, 0.25);
+            --tint-shadow: rgba(8, 47, 73, 0.45);
+            --tint-shadow-deep: rgba(4, 12, 28, 0.55);
+            --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         html {
-            background: radial-gradient(circle at 18% 12%, rgba(56, 189, 248, 0.22), transparent 30%),
-                        radial-gradient(circle at 82% 8%, rgba(250, 204, 21, 0.12), transparent 26%),
-                        linear-gradient(145deg, var(--sky-ink) 0%, var(--sky-deep) 48%, var(--sky-mid) 100%);
+            background: radial-gradient(ellipse at 20% 0%, rgba(56, 189, 248, 0.08), transparent 50%),
+                        radial-gradient(ellipse at 80% 5%, rgba(250, 204, 21, 0.04), transparent 40%),
+                        linear-gradient(165deg, var(--sky-ink) 0%, var(--sky-deep) 55%, var(--sky-mid) 100%);
             background-attachment: fixed;
         }
 
         body {
-            font-family: 'Inter', system-ui, sans-serif;
+            font-family: 'Geist', system-ui, sans-serif;
             background: transparent;
             background-attachment: fixed;
             min-height: 100vh;
-            letter-spacing: -0.01em;
+            letter-spacing: -0.015em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
 
         body::before {
@@ -74,40 +84,48 @@
             position: fixed;
             inset: 0;
             pointer-events: none;
-            background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+            background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
             background-size: 56px 56px;
-            mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent 72%);
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent 65%);
         }
 
         .card {
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.56));
-            backdrop-filter: blur(18px) saturate(130%);
+            background: linear-gradient(180deg, rgba(11, 24, 40, 0.82), rgba(11, 24, 40, 0.58));
+            backdrop-filter: blur(20px) saturate(140%);
             border: 1px solid var(--glass-border);
-            box-shadow: 0 18px 60px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255,255,255,0.06);
+            box-shadow:
+                0 20px 50px var(--tint-shadow),
+                inset 0 1px 0 var(--glass-highlight);
         }
 
         .hero-card {
             position: relative;
             overflow: hidden;
+            border: 1px solid rgba(56, 189, 248, 0.12);
+            background: linear-gradient(180deg, rgba(11, 24, 40, 0.88), rgba(14, 32, 54, 0.72));
+            box-shadow:
+                0 24px 60px var(--tint-shadow-deep),
+                inset 0 1px 0 var(--glass-highlight),
+                inset 0 0 0 1px rgba(56, 189, 248, 0.04);
         }
 
         .hero-card::after {
             content: '';
             position: absolute;
-            width: 340px;
-            height: 340px;
-            right: -120px;
-            top: -140px;
+            width: 380px;
+            height: 380px;
+            right: -140px;
+            top: -160px;
             border-radius: 9999px;
-            background: radial-gradient(circle, rgba(56,189,248,0.28), transparent 68%);
+            background: radial-gradient(circle, rgba(56,189,248,0.18), transparent 65%);
             pointer-events: none;
         }
 
         .skeleton {
-            background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+            background: linear-gradient(90deg, #1a2a3e 25%, #243650 50%, #1a2a3e 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
-            border-radius: 4px;
+            border-radius: 6px;
         }
 
         @keyframes shimmer {
@@ -119,10 +137,10 @@
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
+            border: 3px solid rgba(56, 189, 248, 0.2);
             border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
+            border-top-color: var(--accent);
+            animation: spin 0.8s var(--ease-smooth) infinite;
         }
 
         @keyframes spin {
@@ -130,22 +148,23 @@
         }
 
         ::-webkit-scrollbar {
-            height: 8px;
-            width: 8px;
+            height: 6px;
+            width: 6px;
         }
 
         ::-webkit-scrollbar-track {
-            background: #1f2937;
-            border-radius: 4px;
+            background: rgba(11, 24, 40, 0.4);
+            border-radius: 3px;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 4px;
+            background: rgba(56, 189, 248, 0.25);
+            border-radius: 3px;
+            transition: background 0.2s ease;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #6b7280;
+            background: rgba(56, 189, 248, 0.45);
         }
 
         .modal {
@@ -157,8 +176,8 @@
             width: 100%;
             height: 100%;
             overflow: auto;
-            background-color: rgba(0,0,0,0.75);
-            backdrop-filter: blur(5px);
+            background-color: rgba(4, 12, 28, 0.72);
+            backdrop-filter: blur(8px);
         }
 
         .modal.active {
@@ -168,55 +187,81 @@
         }
 
         .modal-content {
-            background: rgba(31, 41, 55, 0.95);
-            backdrop-filter: blur(20px);
+            background: linear-gradient(180deg, rgba(15, 30, 52, 0.96), rgba(11, 24, 40, 0.94));
+            backdrop-filter: blur(24px) saturate(140%);
             margin: auto;
             padding: 0;
-            border: 1px solid rgba(75, 85, 99, 0.5);
-            border-radius: 1rem;
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            border-radius: 1.25rem;
             width: 90%;
             max-width: 900px;
             max-height: 90vh;
             overflow-y: auto;
-            animation: modalSlideIn 0.3s ease-out;
+            animation: modalSlideIn 0.35s var(--ease-spring);
+            box-shadow:
+                0 30px 80px var(--tint-shadow-deep),
+                inset 0 1px 0 var(--glass-highlight);
         }
 
         @keyframes modalSlideIn {
             from {
                 opacity: 0;
-                transform: translateY(-50px);
+                transform: translateY(-40px) scale(0.98);
             }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
         }
 
         .clickable {
             cursor: pointer;
-            transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            transition: transform 0.25s var(--ease-spring), background 0.25s var(--ease-spring), border-color 0.25s var(--ease-spring), box-shadow 0.25s var(--ease-spring);
         }
 
         .clickable:hover {
             transform: translateY(-2px) scale(1.01);
-            background: rgba(56, 189, 248, 0.12) !important;
-            box-shadow: 0 12px 30px rgba(8, 47, 73, 0.28);
+            background: var(--accent-dim) !important;
+            box-shadow: 0 12px 30px var(--tint-shadow);
+        }
+
+        .clickable:active {
+            transform: scale(0.98);
         }
 
         .stat-card {
-            background: rgba(15, 23, 42, 0.48);
-            border: 1px solid rgba(148, 163, 184, 0.16);
-            transition: all 0.2s ease;
+            background: rgba(11, 24, 40, 0.42);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            transition: all 0.25s var(--ease-spring);
         }
 
         .stat-card:hover {
-            background: rgba(14, 116, 144, 0.18);
-            border-color: rgba(125, 211, 252, 0.36);
+            background: rgba(14, 116, 144, 0.14);
+            border-color: rgba(56, 189, 248, 0.28);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px var(--tint-shadow);
+        }
+
+        .stat-card:active {
+            transform: scale(0.98);
         }
 
         .forecast-chip {
-            border: 1px solid rgba(148, 163, 184, 0.16);
-            background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.055));
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04));
+            transition: all 0.25s var(--ease-spring);
+        }
+
+        .forecast-chip:hover {
+            border-color: rgba(56, 189, 248, 0.22);
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.08), rgba(56, 189, 248, 0.02));
+        }
+
+        /* Secondary card styling - lighter elevation than hero */
+        .card:not(.hero-card) {
+            box-shadow:
+                0 12px 30px var(--tint-shadow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
 
         /* ── iOS 27-style Highlights Toggle ── */
@@ -475,7 +520,8 @@
 
         .temp-display {
             font-variant-numeric: tabular-nums;
-            text-shadow: 0 10px 34px rgba(56, 189, 248, 0.25);
+            letter-spacing: -0.04em;
+            text-shadow: 0 10px 34px rgba(56, 189, 248, 0.18);
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -550,26 +596,38 @@
         }
 
         .search-input {
-            background: rgba(15, 23, 42, 0.72);
-            border: 1px solid rgba(148, 163, 184, 0.24);
-            transition: all 0.2s ease;
+            background: rgba(11, 24, 40, 0.68);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            transition: all 0.25s var(--ease-spring);
         }
 
         .search-input:focus {
-            background: rgba(15, 23, 42, 0.92);
-            border-color: rgba(56, 189, 248, 0.75);
-            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.14);
+            background: rgba(11, 24, 40, 0.88);
+            border-color: rgba(56, 189, 248, 0.65);
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12), 0 8px 20px var(--tint-shadow);
+            outline: none;
         }
 
         .btn {
-            background: rgba(15, 23, 42, 0.68);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            transition: all 0.2s ease;
+            background: rgba(11, 24, 40, 0.64);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            transition: all 0.25s var(--ease-spring);
         }
 
         .btn:hover {
-            background: rgba(14, 116, 144, 0.28);
-            border-color: rgba(125, 211, 252, 0.45);
+            background: rgba(14, 116, 144, 0.24);
+            border-color: rgba(56, 189, 248, 0.4);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px var(--tint-shadow);
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
         }
 
         .search-autocomplete {
@@ -593,7 +651,7 @@
 
         /* MathJax formula containers */
         .formula-container {
-            background: rgba(31, 41, 55, 0.5);
+            background: rgba(11, 24, 40, 0.5);
             border-radius: 0.5rem;
             padding: 1rem;
             text-align: center;
@@ -609,17 +667,48 @@
                 font-size: 0.85em;
             }
         }
+
+        /* Focus visible for all interactive elements */
+        *:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+        /* Selection color */
+        ::selection {
+            background: rgba(56, 189, 248, 0.25);
+            color: #fff;
+        }
+
+        /* Section header refinement */
+        .section-header h3 {
+            letter-spacing: -0.02em;
+            font-weight: 600;
+        }
+
+        /* Tabular nums for all numeric stat displays */
+        .stat-card > div:last-child,
+        .stat-card .text-xl,
+        .stat-card .text-2xl {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Smooth scroll behavior */
+        html {
+            scroll-behavior: smooth;
+        }
     </style>
 </head>
 <body class="text-white p-3 sm:p-4 md:p-8 selection:bg-sky-300/30 selection:text-white">
     <div class="max-w-6xl mx-auto relative z-10">
         <!-- Header -->
         <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3" style="letter-spacing: -0.03em;">
                 <span class="text-4xl">🌤️</span>
                 Jaccuweather
             </h1>
-            <p class="text-gray-400 text-sm">Powered by Open-Meteo + Ventusky</p>
+            <p class="text-gray-400 text-sm font-medium tracking-wide">Powered by Open-Meteo + Ventusky</p>
 
         </header>
 
@@ -691,9 +780,51 @@
         </div>
 
         <!-- Loading State -->
-        <div id="loading" class="hidden text-center py-12">
-            <div class="loading-spinner mx-auto mb-4"></div>
-            <p class="text-gray-300">Loading weather data...</p>
+        <div id="loading" class="hidden">
+            <!-- Hero card skeleton -->
+            <div class="card rounded-3xl p-6 md:p-8 mb-6">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="space-y-3">
+                        <div class="skeleton h-8 w-48 rounded-lg"></div>
+                        <div class="skeleton h-4 w-32 rounded-lg"></div>
+                        <div class="skeleton h-3 w-24 rounded-lg"></div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="skeleton h-16 w-16 rounded-2xl"></div>
+                        <div class="skeleton h-12 w-24 rounded-lg"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <div class="skeleton h-20 rounded-xl"></div>
+                    <div class="skeleton h-20 rounded-xl"></div>
+                    <div class="skeleton h-20 rounded-xl"></div>
+                    <div class="skeleton h-20 rounded-xl"></div>
+                </div>
+            </div>
+            <!-- Forecast skeleton -->
+            <div class="card rounded-2xl p-6 md:p-8 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="skeleton h-7 w-48 rounded-lg"></div>
+                    <div class="skeleton h-8 w-32 rounded-full"></div>
+                </div>
+                <div class="flex gap-3 pb-2">
+                    <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
+                    <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
+                    <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
+                    <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
+                    <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
+                </div>
+            </div>
+            <!-- Daily forecast skeleton -->
+            <div class="card rounded-2xl p-6 md:p-8 mb-6">
+                <div class="skeleton h-7 w-40 rounded-lg mb-4"></div>
+                <div class="space-y-2">
+                    <div class="skeleton h-14 rounded-lg"></div>
+                    <div class="skeleton h-14 rounded-lg"></div>
+                    <div class="skeleton h-14 rounded-lg"></div>
+                    <div class="skeleton h-14 rounded-lg"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -704,7 +835,12 @@
                     <div>
                         <h2 id="currentLocation" class="text-2xl md:text-3xl font-bold text-white mb-2"></h2>
                         <p id="currentDate" class="text-gray-400"></p>
-                        <p id="lastUpdated" class="text-gray-500 text-xs mt-1"></p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <p id="lastUpdated" class="text-gray-500 text-xs"></p>
+                            <button id="refreshBtn" class="text-gray-500 hover:text-sky-300 transition-colors" title="Refresh weather data" aria-label="Refresh weather data">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="text-left md:text-right mt-4 md:mt-0">
                         <div class="flex flex-col md:flex-row md:items-end md:justify-end md:gap-3">
@@ -718,7 +854,12 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <!-- Comfort group -->
+                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1 flex items-center gap-2">
+                        <span class="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Conditions</span>
+                        <div class="flex-1 h-px bg-white/8"></div>
+                    </div>
                     <div class="stat-card rounded-xl p-4">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-thermometer-half text-orange-400 mr-1"></i>Feels Like</div>
                         <div id="feelsLike" class="text-xl font-bold text-white"></div>
@@ -735,6 +876,11 @@
                     <div class="stat-card rounded-xl p-4">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-sun text-yellow-400 mr-1"></i>UV Index</div>
                         <div id="uvIndex" class="text-xl font-bold text-white"></div>
+                    </div>
+                    <!-- Atmosphere group -->
+                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1 flex items-center gap-2">
+                        <span class="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Atmosphere</span>
+                        <div class="flex-1 h-px bg-white/8"></div>
                     </div>
                     <div class="stat-card rounded-xl p-4">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-sun text-yellow-500 mr-1"></i>Sun</div>
@@ -764,6 +910,11 @@
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-lungs text-green-400 mr-1"></i>Air Quality</div>
                         <div id="aqiValue" class="text-xl font-bold text-white"></div>
                         <div id="aqiStatus" class="text-gray-500 text-xs"></div>
+                    </div>
+                    <!-- Health group -->
+                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1 flex items-center gap-2">
+                        <span class="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Health</span>
+                        <div class="flex-1 h-px bg-white/8"></div>
                     </div>
                     <div id="sinusRiskSection" class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="openSymptomRiskModal('sinus')">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-head-side-cough text-blue-300 mr-1"></i>Sinus <i class="fas fa-info-circle text-xs ml-1"></i></div>

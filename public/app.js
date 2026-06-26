@@ -1350,6 +1350,20 @@ locationInputEl.addEventListener('keydown', onSearchInputKeydown);
 locationInputEl.addEventListener('focus', onSearchInputFocus);
 locationInputEl.addEventListener('blur', onSearchInputBlur);
 document.addEventListener('click', onDocumentClickForAutocomplete);
+
+// Refresh button - re-fetch weather for current location
+document.getElementById('refreshBtn').addEventListener('click', () => {
+    if (currentLat && currentLon) {
+        const btn = document.getElementById('refreshBtn');
+        const svg = btn.querySelector('svg');
+        if (svg) {
+            svg.style.transition = 'transform 0.6s var(--ease-spring)';
+            svg.style.transform = 'rotate(360deg)';
+            setTimeout(() => { svg.style.transition = 'none'; svg.style.transform = 'rotate(0deg)'; }, 600);
+        }
+        fetchWeather(currentLat, currentLon);
+    }
+});
 document.getElementById('locationBtn').addEventListener('click', () => {
     const btn = document.getElementById('locationBtn');
 
@@ -1378,9 +1392,9 @@ document.getElementById('locationBtn').addEventListener('click', () => {
                 btn.disabled = false;
                 btn.title = 'Use Current Location';
                 if (err.code === 1) {
-                    showLocationBtnError(btn, 'Location blocked — enable in browser settings');
+                    showLocationBtnError(btn, 'Location blocked - enable in browser settings');
                 } else if (err.code === 3) {
-                    showLocationBtnError(btn, 'Location timed out — try again');
+                    showLocationBtnError(btn, 'Location timed out - try again');
                 } else {
                     showLocationBtnError(btn, 'Unable to get location');
                 }
@@ -1393,7 +1407,7 @@ document.getElementById('locationBtn').addEventListener('click', () => {
     if (navigator.permissions) {
         navigator.permissions.query({ name: 'geolocation' }).then((result) => {
             if (result.state === 'denied') {
-                showLocationBtnError(btn, 'Location blocked — enable in browser settings');
+                showLocationBtnError(btn, 'Location blocked - enable in browser settings');
             } else {
                 doGeolocate();
             }
@@ -1531,12 +1545,18 @@ async function fetchSuggestions(query) {
 }
 
 function formatSuggestionSubtitle(result) {
-    return [result.admin1, result.country].filter(Boolean).join(', ');
+    return [result.admin1, result.country ? cleanLocationName(result.country) : result.country].filter(Boolean).join(', ');
+}
+
+function cleanLocationName(name) {
+    if (!name) return name;
+    // Remove trailing "(the)" artifact from BigDataCloud API
+    return name.replace(/\s*\(the\)\s*$/i, '').trim();
 }
 
 function formatDisplayLocationName(result) {
     const name = result.name || result.admin1 || result.admin2 || '';
-    const resultCountry = result.country || '';
+    const resultCountry = result.country ? cleanLocationName(result.country) : '';
     const admin1 = result.admin1 || '';
     const isUS = resultCountry && (
         resultCountry.includes('United States') ||
@@ -1767,7 +1787,7 @@ async function fetchWeather(lat, lon) {
                     // Try to get city name, fallback to town, village, or municipality
                     const cityName = data.city || data.locality || data.town || data.village || data.municipality || data.county;
                     const stateName = data.principalSubdivision;
-                    const countryName = data.countryName;
+                    const countryName = cleanLocationName(data.countryName);
 
                     // Check if it's US (handle various formats like "United States", "United States of America", etc.)
                     const isUS = countryName && (
@@ -2129,6 +2149,19 @@ function displayWeather(data) {
         const apparentMax = hasApparentTemps ? Math.round(apparentMaxRaw) : null;
         const apparentMin = hasApparentTemps ? Math.round(apparentMinRaw) : null;
         const apparentUnit = UNITS.temperature;
+
+        // Week separator every 7 days
+        if (i > 0 && i % 7 === 0) {
+            const separator = document.createElement('div');
+            separator.className = 'week-separator flex items-center gap-3 my-4 px-2';
+            separator.innerHTML = `
+                <div class="flex-1 h-px bg-white/10"></div>
+                <span class="text-white/40 text-xs font-semibold tracking-wider uppercase">Week ${Math.floor(i / 7) + 1}</span>
+                <div class="flex-1 h-px bg-white/10"></div>
+            `;
+            dailyContainer.appendChild(separator);
+        }
+
         const dayItem = document.createElement('div');
         dayItem.className = 'daily-forecast-card forecast-chip rounded-lg p-4 backdrop-blur-sm clickable';
         dayItem.innerHTML = `
@@ -2989,7 +3022,7 @@ function hasAnyPollenData(current) {
 }
 
 function formatPollenValue(value) {
-    return hasPollenValue(value) ? Math.round(Number(value)) : '—';
+    return hasPollenValue(value) ? Math.round(Number(value)) : '-';
 }
 
 function updateAllergyRiskDisplay(risk) {
@@ -2997,7 +3030,7 @@ function updateAllergyRiskDisplay(risk) {
     const labelEl = document.getElementById('allergyRiskLabel');
 
     if (risk === null || risk === undefined) {
-        valueEl.textContent = '—/10';
+        valueEl.textContent = '-/10';
         labelEl.textContent = 'Pollen pending';
         labelEl.className = 'text-xs font-semibold text-gray-400';
         return;
@@ -3691,7 +3724,7 @@ function openNiceWeatherModal() {
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <div class="font-semibold text-white"><i class="${factor.iconClass} mr-2"></i>${factor.name}</div>
-                        <div class="text-gray-400 text-sm mt-1">${factor.value} — ${factor.note}</div>
+                        <div class="text-gray-400 text-sm mt-1">${factor.value} - ${factor.note}</div>
                     </div>
                     <div class="shrink-0 font-bold ${factor.points > 0 ? 'text-yellow-400' : 'text-green-400'}">${factor.points > 0 ? `−${factor.points}` : '0'}</div>
                 </div>
