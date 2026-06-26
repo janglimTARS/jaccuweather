@@ -3717,6 +3717,9 @@ function initializeChartSelector(selectId) {
     const newSelect = select.cloneNode(true);
     select.parentNode.replaceChild(newSelect, select);
 
+    // cloneNode doesn't reliably preserve select.value — set it after insertion
+    newSelect.value = 'temp';
+
     // IMPORTANT: updateChartVisibility must reference newSelect (the live DOM element),
     // not the original select (detached after clone). The closure captures `select`
     // which is no longer in the DOM after replaceChild.
