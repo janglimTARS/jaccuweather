@@ -50,7 +50,7 @@ function baseChartOptions(overrides = {}) {
     // Docs: https://apexcharts.com/docs/options/chart/
     const isMobile = window.innerWidth <= 768;
     const baseTickAmount = isMobile ? 4 : 6;
-    const baseChartHeight = isMobile ? 200 : 300;
+    const baseChartHeight = isMobile ? 250 : 300;
 
     const opts = {
         chart: {
