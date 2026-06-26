@@ -538,7 +538,14 @@
             }
 
             .chart-container .apexcharts-canvas {
-                min-height: 250px;
+                min-height: 200px;
+            }
+
+            /* Mobile: reduce chart container padding to maximize chart width */
+            /* pan-y allows vertical scroll but lets chart capture horizontal drag for scrubbing */
+            .chart-container {
+                padding: 0.5rem !important;
+                touch-action: pan-y;
             }
         }
 
@@ -956,33 +963,33 @@
             </div>
             <div class="space-y-6">
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="temp">
-                    <div id="hourlyTempChart" style="height: 250px;"></div>
+                    <div id="hourlyTempChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="precip">
-                    <div id="hourlyPrecipChart" style="height: 250px;"></div>
+                    <div id="hourlyPrecipChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="wind">
-                    <div id="hourlyWindChart" style="height: 250px;"></div>
+                    <div id="hourlyWindChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="humidity">
-                    <div id="hourlyHumidityChart" style="height: 250px;"></div>
+                    <div id="hourlyHumidityChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="pressure">
-                    <div id="hourlyPressureChart" style="height: 250px;"></div>
+                    <div id="hourlyPressureChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="snow">
-                    <div id="hourlySnowChart" style="height: 250px;"></div>
+                    <div id="hourlySnowChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="cloud">
-                    <div id="hourlyCloudChart" style="height: 250px;"></div>
+                    <div id="hourlyCloudChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="brightness">
-                    <div id="hourlyBrightnessChart" style="height: 250px;"></div>
+                    <div id="hourlyBrightnessChart"></div>
                 </div>
                 <div id="hourlyTidesChartContainer" class="card rounded-xl p-4 chart-container" data-chart-type="tides" data-feature-hidden="true">
                     <div class="mb-2 text-cyan-100 font-semibold">NOAA Tide Height (48h)</div>
                     <div id="hourlyTidesSubtitle" class="mb-3 text-cyan-200/80 text-sm"></div>
-                    <div id="hourlyTidesChart" style="height: 250px;"></div>
+                    <div id="hourlyTidesChart"></div>
                 </div>
                 <div id="hourlyDetails" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Detailed hourly items will be inserted here -->
@@ -1022,41 +1029,41 @@
             </div>
             <div class="space-y-6">
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="temp">
-                    <div id="dailyTempChart" style="height: 250px;"></div>
+                    <div id="dailyTempChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="feelslike">
-                    <div id="dailyFeelsLikeChart" style="height: 250px;"></div>
+                    <div id="dailyFeelsLikeChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="niceweather">
                     <div class="mb-2 text-sm font-semibold text-lime-100">14-Day Nice Weather Index</div>
                     <div class="mb-3 text-lime-200/80 text-sm">Higher scores mean more comfortable outdoor weather.</div>
-                    <div id="dailyNiceWeatherChart" style="height: 250px;"></div>
+                    <div id="dailyNiceWeatherChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="precip">
-                    <div id="dailyPrecipChart" style="height: 250px;"></div>
+                    <div id="dailyPrecipChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="wind">
-                    <div id="dailyWindChart" style="height: 250px;"></div>
+                    <div id="dailyWindChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="pressure">
-                    <div id="dailyPressureChart" style="height: 250px;"></div>
+                    <div id="dailyPressureChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="snow">
-                    <div id="dailySnowChart" style="height: 250px;"></div>
+                    <div id="dailySnowChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="cloud">
-                    <div id="dailyCloudChart" style="height: 250px;"></div>
+                    <div id="dailyCloudChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="brightness">
-                    <div id="dailyBrightnessChart" style="height: 250px;"></div>
+                    <div id="dailyBrightnessChart"></div>
                 </div>
                 <div id="dailyTidesChartContainer" class="card rounded-xl p-4 chart-container" data-chart-type="tides" data-feature-hidden="true">
                     <div class="mb-2 text-sm font-semibold text-cyan-100">14-Day Tide Forecast</div>
                     <div id="dailyTidesSubtitle" class="mb-3 text-cyan-200/80 text-sm"></div>
-                    <div id="dailyTidesChart" style="height: 250px;"></div>
+                    <div id="dailyTidesChart"></div>
                 </div>
                 <div class="card rounded-xl p-4 chart-container" data-chart-type="moon">
-                    <div id="dailyMoonPhaseChart" style="height: 250px;"></div>
+                    <div id="dailyMoonPhaseChart"></div>
                 </div>
                 <div id="dailyDetails" class="space-y-3">
                     <!-- Detailed daily items will be inserted here -->

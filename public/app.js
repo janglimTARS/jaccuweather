@@ -46,21 +46,36 @@ function baseChartOptions(overrides = {}) {
     const xaxisCategories = overrides.xaxis?.categories;
     const xaxisTickAmount = overrides.xaxis?.tickAmount;
 
+    // Mobile-specific chart optimizations
+    // Docs: https://apexcharts.com/docs/options/chart/
+    const isMobile = window.innerWidth <= 768;
+    const baseTickAmount = isMobile ? 4 : 6;
+    const baseChartHeight = isMobile ? 200 : 300;
+
     const opts = {
         chart: {
             type: 'area',
             background: 'transparent',
             foreColor: '#fff',
             toolbar: { show: false },
-            animations: { enabled: true, easing: 'easeinout', speed: 600 },
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 600,
+                // Mobile: disable one-by-one gradual animation (48 pts * 150ms delay = 7.2s)
+                animateGradually: { enabled: !isMobile },
+            },
             fontFamily: 'inherit',
-            height: 250,
+            height: baseChartHeight,
+            // Mobile: disable zoom — drag-to-zoom hijacks touch scrolling
+            // Docs: chart.zoom.enabled defaults to true
+            zoom: { enabled: !isMobile },
             ...overrides.chart
         },
         theme: { mode: 'dark' },
         grid: { borderColor: 'rgba(255,255,255,0.08)', strokeDashArray: 3 },
         legend: { show: true, position: 'top', labels: { colors: '#fff' }, fontSize: '13px' },
-        stroke: { curve: 'smooth', width: 3, lineCap: 'round' },
+        stroke: { curve: 'monotoneCubic', width: 3, lineCap: 'round' },
         fill: {
             type: 'gradient',
             gradient: {
@@ -72,10 +87,14 @@ function baseChartOptions(overrides = {}) {
         },
         markers: { size: 0, hover: { size: 5 } },
         dataLabels: { enabled: false },
-        tooltip: { theme: 'dark' },
+        tooltip: {
+            theme: 'dark',
+            // Mobile: tooltip follows finger during drag-scrub
+            followCursor: isMobile,
+        },
         xaxis: {
             categories: xaxisCategories || [],
-            tickAmount: xaxisTickAmount || 6,
+            tickAmount: xaxisTickAmount || baseTickAmount,
             labels: {
                 style: { colors: '#fff', fontSize: '11px' },
                 rotate: -40,
@@ -88,19 +107,25 @@ function baseChartOptions(overrides = {}) {
         },
     };
 
-    // Merge overrides on top, but preserve base chart/xaxis/yaxis settings
+    // Merge overrides on top, but preserve xaxis/yaxis base settings
     const merged = { ...opts, ...overrides };
 
-    // Re-apply chart so toolbar/animations/etc survive override clobbering
+    // Re-apply chart so toolbar/animations/zoom survive override clobbering
     merged.chart = {
         ...opts.chart,
         ...overrides.chart,
     };
 
+    // Re-apply tooltip so mobile followCursor/fixed survive override clobbering
+    merged.tooltip = {
+        ...opts.tooltip,
+        ...overrides.tooltip,
+    };
+
     // Re-apply xaxis/yaxis so base label settings survive override clobbering
     merged.xaxis = {
         categories: xaxisCategories || overrides.xaxis?.categories || [],
-        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || 6,
+        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || baseTickAmount,
         labels: {
             style: { colors: '#fff', fontSize: '11px' },
             rotate: -40,
@@ -110,7 +135,7 @@ function baseChartOptions(overrides = {}) {
         },
         ...overrides.xaxis,
         categories: xaxisCategories || overrides.xaxis?.categories || [],
-        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || 6,
+        tickAmount: xaxisTickAmount || overrides.xaxis?.tickAmount || baseTickAmount,
     };
 
     merged.yaxis = {
@@ -3685,8 +3710,21 @@ function initializeChartSelector(selectId) {
     const modal = select.closest('.modal');
     const chartContainers = modal.querySelectorAll('.chart-container');
 
+    // Set initial state to show temperature chart
+    select.value = 'temp';
+
+    // Replace select with clone to remove stale event listeners
+    const newSelect = select.cloneNode(true);
+    select.parentNode.replaceChild(newSelect, select);
+
+    // cloneNode doesn't reliably preserve select.value — set it after insertion
+    newSelect.value = 'temp';
+
+    // IMPORTANT: updateChartVisibility must reference newSelect (the live DOM element),
+    // not the original select (detached after clone). The closure captures `select`
+    // which is no longer in the DOM after replaceChild.
     function updateChartVisibility() {
-        const selectedValue = document.getElementById(selectId).value;
+        const selectedValue = newSelect.value;
 
         chartContainers.forEach(container => {
             if (container.dataset.featureHidden === 'true') {
@@ -3702,13 +3740,8 @@ function initializeChartSelector(selectId) {
         });
     }
 
-    // Set initial state to show temperature chart
-    select.value = 'temp';
+    // Apply initial visibility for the cloned select
     updateChartVisibility();
-
-    // Remove old listener by cloning, then attach fresh
-    const newSelect = select.cloneNode(true);
-    select.parentNode.replaceChild(newSelect, select);
     newSelect.addEventListener('change', updateChartVisibility);
 }
 
@@ -3717,9 +3750,6 @@ function openHourlyModal(data) {
     const modal = document.getElementById('hourlyModal');
     modal.classList.add('active');
     setHourlyTidesVisibility(currentTideData);
-
-    const isMobileChartViewport = window.innerWidth <= 768;
-    const modalChartAspectRatio = isMobileChartViewport ? 1.2 : 2.2;
 
     // Show all chart containers so ApexCharts can measure width
     modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'block');
@@ -3853,31 +3883,28 @@ function openHourlyModal(data) {
         });
     }
 
-    // Build tide annotations for H/L markers (ApexCharts points annotations - must be an array)
-    const tideAnnotations = tideMarkerLabels.map((point) => ({
-        x: tideLabels[point.index],
-        y: point.value,
-        marker: {
-            size: 5,
-            fillColor: point.text === 'H' ? '#67e8f9' : '#22d3ee',
-            strokeColor: '#fff',
-            strokeWidth: 1,
-            shape: point.text === 'H' ? 'circle' : 'square'
-        },
-        label: {
-            text: point.text,
+    // Build tide annotations for H/L markers
+    const tideAnnotations = {};
+    tideMarkerLabels.forEach((point) => {
+        const labelKey = `tideLabel_${point.index}_${point.text}`;
+        tideAnnotations[labelKey] = {
+            x: point.index,
+            y: point.value,
             borderColor: 'transparent',
-            offsetX: 0,
-            offsetY: -8,
-            style: {
-                background: 'transparent',
-                color: '#67e8f9',
-                fontSize: '11px',
-                fontWeight: 600,
-                cssClass: 'apexcharts-tide-label'
+            label: {
+                text: point.text,
+                position: 'top',
+                offsetY: -8,
+                style: {
+                    background: 'transparent',
+                    color: '#67e8f9',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cssClass: 'apexcharts-tide-label'
+                }
             }
-        }
-    }));
+        };
+    });
 
     hourlyChart = {};
     hourlyChart.temp = new ApexCharts(document.getElementById('hourlyTempChart'), baseChartOptions({
@@ -3963,16 +3990,18 @@ function openHourlyModal(data) {
     hourlyChart.brightness.render();
 
     hourlyChart.tides = (hasTideData && tideChartEl) ? new ApexCharts(tideChartEl, baseChartOptions({
-        chart: { type: 'area' },
+        chart: { type: 'line' },
         series: [
-            { name: 'Tide Height (ft, MLLW)', data: tideValues }
+            { name: 'Tide Height (ft, MLLW)', data: tideValues, type: 'area' },
+            { name: 'High Tide', data: tideHighMarkers, type: 'scatter' },
+            { name: 'Low Tide', data: tideLowMarkers, type: 'scatter' }
         ],
-        colors: ['#06b6d4'],
-        stroke: { curve: 'smooth', width: 3 },
-        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
-        markers: { size: 0, hover: { size: 4 } },
-        xaxis: { categories: tideLabels, tickAmount: 6 },
-        yaxis: { min: tideYAxisBounds.min, max: tideYAxisBounds.max, tickAmount: 5, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${Number(val).toFixed(1)} ft` } },
+        colors: ['#06b6d4', '#67e8f9', '#22d3ee'],
+        stroke: { curve: 'monotoneCubic', width: [3, 0, 0] },
+        fill: { type: ['gradient', 'solid', 'solid'], opacity: [0.3, 1, 1] },
+        markers: { size: [0, 6, 6], shape: ['circle', 'circle', 'square'] },
+        xaxis: { categories: tideLabels },
+        yaxis: { min: tideYAxisBounds.min, max: tideYAxisBounds.max, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val} ft` } },
         tooltip: { y: { formatter: (val) => `${Number(val).toFixed(1)} ft` } },
         annotations: { points: tideAnnotations }
     })) : null;
@@ -4026,9 +4055,6 @@ function openDailyModal(data) {
     const modal = document.getElementById('dailyModal');
     modal.classList.add('active');
     setDailyTidesVisibility(currentTideData);
-
-    const isMobileChartViewport = window.innerWidth <= 768;
-    const modalChartAspectRatio = isMobileChartViewport ? 1.2 : 2.2;
 
     // Show all chart containers so ApexCharts can measure width
     modal.querySelectorAll('.chart-container').forEach(c => c.style.display = 'block');
@@ -4205,31 +4231,28 @@ function openDailyModal(data) {
     const maxDailyShortwave = Math.max(...dailyShortwaveAverage.filter(v => v !== null && v !== undefined && v > 0), 1);
     const dailyBrightnessData = dailyShortwaveAverage.map(v => v === null || v === undefined ? 0 : Math.round((v / maxDailyShortwave) * 100));
 
-    // Build daily tide annotations for H/L markers (array format for ApexCharts)
-    const dailyTideAnnotations = dailyTideMarkerLabels.map((point) => ({
-        x: dailyTideLabels[point.index],
-        y: point.value,
-        marker: {
-            size: 4,
-            fillColor: point.text === 'H' ? '#67e8f9' : '#22d3ee',
-            strokeColor: '#fff',
-            strokeWidth: 1,
-            shape: point.text === 'H' ? 'circle' : 'square'
-        },
-        label: {
-            text: point.text,
+    // Build daily tide annotations for H/L markers
+    const dailyTideAnnotations = {};
+    dailyTideMarkerLabels.forEach((point) => {
+        const labelKey = `dailyTideLabel_${point.index}_${point.text}`;
+        dailyTideAnnotations[labelKey] = {
+            x: point.index,
+            y: point.value,
             borderColor: 'transparent',
-            offsetX: 0,
-            offsetY: -8,
-            style: {
-                background: 'transparent',
-                color: '#67e8f9',
-                fontSize: '10px',
-                fontWeight: 600,
-                cssClass: 'apexcharts-tide-label'
+            label: {
+                text: point.text,
+                position: 'top',
+                offsetY: -8,
+                style: {
+                    background: 'transparent',
+                    color: '#67e8f9',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    cssClass: 'apexcharts-tide-label'
+                }
             }
-        }
-    }));
+        };
+    });
 
     // Create charts
     dailyChart = {};
@@ -4341,16 +4364,18 @@ function openDailyModal(data) {
     dailyChart.brightness.render();
 
     dailyChart.tides = (hasDailyTideData && dailyTideChartEl) ? new ApexCharts(dailyTideChartEl, baseChartOptions({
-        chart: { type: 'area' },
+        chart: { type: 'line' },
         series: [
-            { name: 'Tide Height (ft, MLLW)', data: dailyTideValues }
+            { name: 'Tide Height (ft, MLLW)', data: dailyTideValues, type: 'area' },
+            { name: 'High Tide', data: dailyTideHighMarkers, type: 'scatter' },
+            { name: 'Low Tide', data: dailyTideLowMarkers, type: 'scatter' }
         ],
-        colors: ['#06b6d4'],
-        stroke: { curve: 'smooth', width: 3 },
-        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
-        markers: { size: 0, hover: { size: 4 } },
-        xaxis: { categories: dailyTideLabels, tickAmount: 7 },
-        yaxis: { min: dailyTideYAxisBounds.min, max: dailyTideYAxisBounds.max, tickAmount: 5, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${Number(val).toFixed(1)} ft` } },
+        colors: ['#06b6d4', '#67e8f9', '#22d3ee'],
+        stroke: { curve: 'monotoneCubic', width: [3, 0, 0] },
+        fill: { type: ['gradient', 'solid', 'solid'], opacity: [0.3, 1, 1] },
+        markers: { size: [0, 6, 6], shape: ['circle', 'circle', 'square'] },
+        xaxis: { categories: dailyTideLabels, tickAmount: 14 },
+        yaxis: { min: dailyTideYAxisBounds.min, max: dailyTideYAxisBounds.max, title: { text: 'ft', style: { color: '#fff' } }, labels: { style: { colors: '#fff' }, formatter: (val) => `${val} ft` } },
         tooltip: {
             x: { formatter: (_val, opts) => {
                 const idx = opts?.dataPointIndex;
