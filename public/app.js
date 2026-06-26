@@ -3022,7 +3022,7 @@ function hasAnyPollenData(current) {
 }
 
 function formatPollenValue(value) {
-    return hasPollenValue(value) ? Math.round(Number(value)) : '-';
+    return hasPollenValue(value) ? Math.round(Number(value)) : '0';
 }
 
 function updateAllergyRiskDisplay(risk) {
@@ -3030,8 +3030,8 @@ function updateAllergyRiskDisplay(risk) {
     const labelEl = document.getElementById('allergyRiskLabel');
 
     if (risk === null || risk === undefined) {
-        valueEl.textContent = '-/10';
-        labelEl.textContent = 'Pollen pending';
+        valueEl.textContent = '0/10';
+        labelEl.textContent = 'None';
         labelEl.className = 'text-xs font-semibold text-gray-400';
         return;
     }
@@ -3414,10 +3414,7 @@ function updateAllergyRiskWithPollenData() {
 // Get pollen level category based on grains/m³
 function getPollenLevel(value, options = {}) {
     if (value === null || value === undefined) {
-        if (options.displayNullAsNone) {
-            return { label: 'None', colorClass: 'text-gray-400', level: 0 };
-        }
-        return { label: 'Data unavailable', colorClass: 'text-gray-400', level: null };
+        return { label: 'None', colorClass: 'text-gray-400', level: 0 };
     } else if (value === 0) {
         return { label: 'None', colorClass: 'text-gray-400', level: 0 };
     } else if (value <= 20) {
