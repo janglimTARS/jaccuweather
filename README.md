@@ -1,408 +1,201 @@
 # Jaccuweather
 
-A fully featured, modern weather website built as a Cloudflare Worker. Jaccuweather provides real-time weather forecasts, interactive radar maps, health-focused symptom risk forecasting, and detailed meteorological data using the Open-Meteo API and Ventusky for radar visualization.
+A full-featured weather application deployed as a Cloudflare Worker. Vanilla JavaScript, no framework. Proxies free APIs (Open-Meteo, NWS, BigDataCloud, Ventusky, Google Pollen) for CORS, renders everything client-side.
 
-## 🌟 Features
+**Live:** [weather.janglim.cloud](https://weather.janglim.cloud)
 
-### Core Weather Features
-- 🌤️ **Current Weather Display** - Real-time temperature, conditions, humidity, wind speed, UV index, and "feels like" temperature
-- 📅 **14-Day Forecast** - Extended weather forecast with daily highs, lows, precipitation totals, snowfall, wind speeds, sunrise/sunset times, and moon phases
-- ⏰ **24-Hour Forecast** - Detailed hourly weather predictions with interactive charts showing temperature, precipitation probability, and conditions
-- ❄️ **Weekly Snow Totals** - Displays cumulative snowfall predictions for the week when snow is in the forecast
-- 🌙 **Moon Phase Data** - Comprehensive moon phase information including illumination, moonrise/moonset times, distance, and next full/new moon dates
-- 📊 **Interactive Charts** - Visual temperature, precipitation, wind, and moon phase charts for extended forecasts
+## Features
 
-### Health & Wellness Features
-- 🤧 **Sinus Risk Forecasting** - Calculates risk of sinus discomfort based on barometric pressure changes, humidity, precipitation, and temperature swings
-- 🌿 **Allergy Risk Forecasting** - Estimates pollen allergy risk using real pollen count data (tree, grass, weed) from Open-Meteo Air Quality API
-- 🏥 **Pollen Forecast** - Current pollen levels and 5-day pollen forecast with detailed breakdowns by pollen type
-- 📋 **Health Methodology** - Detailed calculation formulas with LaTeX mathematical expressions for complete transparency
+### Current Conditions
+- Real-time temperature, conditions, feels-like, humidity, wind, UV index
+- Sunrise/sunset times, moon phase with clickable detail modal
+- Pressure with trend indicator
+- Air quality index (when available)
+- Manual refresh button with spin animation
 
-### Location Features
-- 🔍 **Location Search** - Search for any city or location worldwide with autocomplete
-- 📍 **Geolocation** - Automatically detects and displays weather for your current location
-- ⭐ **Favorites System** - Save and quickly access your favorite locations
-- 🔄 **Reverse Geocoding** - Automatically displays location names for coordinates
+### 48-Hour Forecast
+- Three toggle views: Conditions, Precipitation, Wind (iOS 27-style pill toggle)
+- Precipitation intensity bars scaled to the 48h window
+- Wind direction arrows (rotated to meteorological bearing)
+- Uniform chip sizing across all toggle modes
+- Click header to open modal with 9 ApexCharts graphs (temp, precip, wind, humidity, pressure, snow, cloud, brightness, tides)
 
-### Radar & Maps
-- 🗺️ **Interactive Weather Radar** - Embedded Ventusky precipitation map with real-time weather visualization
-- 📍 **Location-Based Radar** - Radar automatically centers on your current or searched location
-- 🎯 **Responsive Design** - Optimized radar view for both desktop and mobile devices
-- 🔒 **Safe Browsing** - Prevents accidental navigation when scrolling past the radar
+### 14-Day Forecast
+- Daily highs/lows, precipitation, snowfall, wind, feels-like temperatures
+- Week 1 / Week 2 separators for scannable grouping
+- Tide summaries per day (coastal locations only, via NOAA)
+- Click header to open modal with 11 ApexCharts graphs (temp, feels-like, nice weather, precip, wind, pressure, snow, cloud, brightness, tides, moon phase)
 
-### User Experience
-- 🎨 **Modern UI** - Beautiful gradient design with glassmorphism effects using Tailwind CSS
-- 📱 **Fully Responsive** - Optimized for desktop, tablet, and mobile devices
-- ⚡ **Fast & Lightweight** - Deployed on Cloudflare's edge network for global performance
-- 🌙 **Dark Theme** - Easy-on-the-eyes dark color scheme
-- 📱 **PWA Ready** - Apple touch icons and mobile web app support
+### Health Tiles
+- **Sinus Risk** - Barometric pressure change, humidity, precipitation, temperature swing. Click for methodology modal with LaTeX formulas.
+- **Allergy Risk** - Real pollen counts (Google Pollen API primary, Tomorrow.io fallback, Open-Meteo tertiary). Wind dispersal and rain washout factors. Click for methodology.
+- **Nice Weather Index** - Comfort score from 0-10 subtracting points for adverse conditions. Click for reasoning breakdown modal.
 
-### Technical Features
-- 🔄 **API Proxy** - Cloudflare Worker proxies API requests to avoid CORS issues
-- 🛡️ **Error Handling** - Comprehensive error handling with user-friendly messages
-- 💾 **Local Storage** - Favorites and preferences saved locally
-- 🚫 **Rate Limit Handling** - Graceful handling of API rate limits
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **Vanilla JavaScript** - No framework dependencies, pure ES6+
-- **Tailwind CSS** - Utility-first CSS framework for styling
-- **Font Awesome** - Icon library for UI elements
-- **Chart.js** - Interactive charts for weather data visualization
-- **SunCalc.js** - Accurate astronomical calculations for moon phases, moonrise/moonset times, and moon distance
-
-### Backend & Infrastructure
-- **Cloudflare Workers** - Serverless deployment platform for edge computing
-- **Open-Meteo API** - Free, open-source weather API for forecast data and air quality/pollen information
-- **Ventusky** - Interactive weather maps and radar visualization
-- **BigDataCloud API** - Reverse geocoding service (free tier)
-- **MathJax** - LaTeX mathematical rendering for formula display
-
-### Development Tools
-- **Wrangler** - Cloudflare Workers CLI for development and deployment
-- **Node.js** - Build tooling and dependencies
-- **Sharp** - Image processing for favicon conversion
-
-## 📦 Installation & Setup
-
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-- Cloudflare account (for deployment)
-- Git (for version control)
-
-### Local Development
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/anglim3/jaccuweather.git
-   cd jaccuweather
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Build the project:**
-   ```bash
-   npm run build
-   ```
-   This generates the Cloudflare Worker file (`src/index.js`) by embedding HTML, JavaScript, and assets.
-
-4. **Run locally:**
-   ```bash
-   npm run dev
-   ```
-   This builds the project and starts a local development server using Wrangler.
-
-### Deployment
-
-1. **Authenticate with Cloudflare:**
-   ```bash
-   npx wrangler login
-   ```
-
-2. **Deploy to Cloudflare Workers:**
-   ```bash
-   npm run deploy
-   ```
-   This builds the project and deploys it to Cloudflare's edge network.
-
-## 📁 Project Structure
-
-```
-Weather/
-├── public/
-│   ├── index.html           # Main HTML template with embedded styles
-│   ├── app.js               # Frontend JavaScript (weather logic, UI interactions)
-│   ├── favicon.svg          # SVG favicon
-│   └── apple-touch-icon.png # iOS home screen icon (auto-generated)
-├── src/
-│   └── index.js             # Cloudflare Worker (auto-generated by build.js)
-├── testing/                 # Local development/testing (git-ignored)
-│   ├── index.html           # Experimental UI designs
-│   └── app.js               # Test JavaScript
-├── build.js                 # Build script that embeds assets into worker
-├── convert-favicon.js       # Converts SVG favicon to PNG for iOS
-├── backup.sh                # Automated backup script for Git
-├── package.json             # Dependencies and npm scripts
-├── wrangler.toml            # Cloudflare Worker configuration
-└── README.md                # This file
-```
-
-## 🔌 API Endpoints
-
-The Cloudflare Worker provides the following endpoints:
-
-### Main Routes
-- `/` or `/index.html` - Serves the main HTML page
-- `/app.js` - Serves the JavaScript application
-- `/favicon.svg` - SVG favicon
-- `/apple-touch-icon.png` - iOS touch icon
-
-### Proxy Routes
-- `/api/forecast` - Proxies requests to Open-Meteo forecast API
-- `/api/geocoding` - Proxies requests to Open-Meteo geocoding API
-- `/api/reverse` - Proxies requests to BigDataCloud reverse geocoding API
-- `/api/air-quality` - Proxies requests to Open-Meteo Air Quality API (includes pollen data)
-- `/ventusky-proxy/*` - Proxies Ventusky requests with desktop user agent to avoid mobile app prompts
-
-## 📋 Features in Detail
-
-### Current Weather Display
-- **Temperature**: Current temperature in Fahrenheit
-- **Feels Like**: Apparent temperature accounting for wind and humidity
-- **Conditions**: Weather description (sunny, cloudy, rain, etc.)
-- **Humidity**: Relative humidity percentage
-- **Wind Speed**: Current wind speed in mph
-- **UV Index**: Current UV index level
-- **Sunrise/Sunset**: Times for the current day
-
-### Hourly Forecast
-- **24-Hour View**: Detailed forecast for the next 24 hours
-- **Interactive Chart**: Visual temperature graph with Chart.js
-- **Hour-by-Hour Data**: Temperature, conditions, precipitation probability, and wind speed
-- **Modal View**: Click header to open expanded modal with full details
-
-### Daily Forecast
-- **14-Day Extended Forecast**: Complete two-week weather predictions
-- **Daily Highs/Lows**: Maximum and minimum temperatures
-- **Precipitation**: Daily precipitation totals and probability
-- **Snowfall**: Daily snowfall accumulation
-- **Wind**: Maximum wind speeds
-- **Sunrise/Sunset**: Daily sunrise and sunset times
-- **Moon Phases**: Moon phase emoji and name for each day
-- **Modal View**: Click header to open expanded modal with full details, charts, and moon phase information
-
-### Weekly Snow Totals
-- **Automatic Display**: Only appears when snow is in the forecast
-- **Cumulative Totals**: Shows total expected snowfall for the week
-- **Daily Breakdown**: Individual day snowfall amounts
-
-### Favorites System
-- **Save Locations**: Add current location to favorites
-- **Quick Access**: Dropdown menu for quick location switching
-- **Local Storage**: Favorites persist across browser sessions
-- **Remove Favorites**: Easy removal of saved locations
-
-### Health & Wellness Features
-
-#### Sinus Risk Forecasting
-- **Risk Calculation**: Estimates sinus discomfort risk based on meteorological factors that commonly trigger sinus symptoms
-- **Factors Considered**:
-  - Barometric pressure changes (sudden drops can cause sinus pressure)
-  - High humidity levels (>70%)
-  - Precipitation events
-  - Temperature swings (>20°F daily change)
-- **Risk Levels**: Low (0-2), Moderate (3-4), High (5-7), Very High (8-10)
-- **Methodology Modal**: Click the Sinus tile to see detailed calculation formulas with LaTeX mathematical expressions
-
-#### Allergy Risk Forecasting
-- **Pollen-Based Calculation**: Uses real pollen count data from Open-Meteo Air Quality API for accurate allergy risk assessment
-- **Pollen Types Tracked**: Tree pollen (Alder, Birch, Olive), Grass pollen, Weed pollen (Mugwort, Ragweed)
-- **Risk Scoring**:
-  - Very High: >200 grains/m³
-  - High: 80-200 grains/m³
-  - Moderate: 20-80 grains/m³
-  - Low: 1-20 grains/m³
-- **Additional Factors**: Wind speed (disperses pollen) and recent precipitation (washes pollen away)
-- **Transparent Methodology**: Click the Allergy tile for detailed formulas and pollen level thresholds
-
-#### Pollen Forecast Section
-- **Current Levels**: Real-time pollen counts for Tree, Grass, and Weed categories with color-coded severity indicators
-- **5-Day Forecast**: Daily maximum pollen levels with emoji indicators and category breakdowns
-- **Data Source**: Open-Meteo Air Quality API (free, no API key required)
-- **Health Insights**: Helps users with pollen allergies plan activities and medication
-
-### Moon Phase Features
-- **Current Moon Phase**: Displays today's moon phase with emoji and name in the current weather section
-- **14-Day Moon Phases**: Moon phase information for each day in the extended forecast
-- **Moon Details Modal**: Click any moon phase tile to see detailed information including:
-  - Moon illumination percentage
-  - Accurate moonrise and moonset times (calculated using SunCalc.js)
-  - Moon distance in miles (varies with lunar cycle)
-  - Days until next full moon and new moon
-- **Moon Phase Chart**: Visual chart showing moon phase progression over 14 days in the expanded forecast modal
+### Pollen Forecast
+- Current tree/grass/weed levels with color-coded severity
+- 5-day pollen forecast
+- Google Pollen API with Tomorrow.io and Open-Meteo fallbacks
 
 ### Weather Radar
-- **Ventusky Integration**: Embedded Ventusky precipitation map
-- **Auto-Centering**: Automatically centers on current or searched location
-- **Responsive Sizing**: Optimized aspect ratios for desktop and mobile (more zoomed out on mobile)
-- **Interactive Controls**: Full Ventusky map controls (zoom, pan, layer switching)
-- **Safe Scrolling**: Prevents accidental navigation when scrolling past the radar
+- Ventusky iframe embed with framebreaker neutralization
+- Auto-centering on current or searched location
+- Mobile zoom level 5, desktop zoom level 7
 
-## 🔧 Development Workflow
+### NWS Weather Alerts
+- US-only severe weather alerts from the National Weather Service
+- Alert banner displayed above the main content
 
-### Making Changes
+### Tide Data
+- NOAA tide predictions for coastal locations
+- 48h tide charts in hourly modal, 14-day tide forecast in daily modal
+- Coastal detection based on NOAA station proximity and elevation
+- High/low tide markers on charts
 
-1. **Edit source files:**
-   - `public/index.html` - HTML structure and styles
-   - `public/app.js` - JavaScript functionality
+### Location & Search
+- Autocomplete search with Open-Meteo geocoding
+- Geolocation button for current location
+- Favorites system (IndexedDB with localStorage fallback)
+- Reverse geocoding via BigDataCloud (cleaned of API artifacts)
+- US state abbreviation normalization
 
-2. **Test locally:**
-   ```bash
-   npm run dev
-   ```
-   Visit the local URL provided by Wrangler (typically `http://localhost:8787`)
+## Design
 
-3. **Build for production:**
-   ```bash
-   npm run build
-   ```
-   This creates the optimized worker file.
+- **Font:** Geist (self-hosted via Google Fonts)
+- **Theme:** Dark navy gradient with sky-blue accent (#38bdf8)
+- **Glassmorphism:** Backdrop-blur cards with inner border highlights and tinted shadows
+- **Skeleton loaders:** Layout-matched shimmer placeholders during data fetch
+- **Interactions:** Spring-easing transitions (cubic-bezier(0.16, 1, 0.3, 1)), active/press feedback (scale 0.98), focus-visible outlines
+- **Metric grouping:** Tiles organized into Conditions, Atmosphere, and Health categories with dividers
+- **Accessibility:** Reduced-motion support, WCAG AA contrast, keyboard focus indicators
+- **Responsive:** Mobile-first with Tailwind breakpoints, touch-action pan-y on charts for mobile scrubbing
 
-4. **Deploy:**
-   ```bash
-   npm run deploy
-   ```
+## Tech Stack
 
-### Testing New Changes
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Vanilla JavaScript (ES6+), Tailwind CSS (CDN), ApexCharts, SunCalc, Font Awesome, Leaflet, MathJax |
+| Backend | Cloudflare Worker (serverless edge) |
+| Weather API | Open-Meteo (forecast, geocoding, air quality) |
+| Pollen API | Google Pollen API (primary), Tomorrow.io (fallback), Open-Meteo (tertiary) |
+| Radar | Ventusky (iframe with proxy) |
+| Alerts | NWS Weather Alerts API (US only) |
+| Tides | NOAA Tides and Currents API |
+| Reverse Geocoding | BigDataCloud (free tier) |
+| Charts | ApexCharts 4.7.0 (monotoneCubic curves, gradient area fills, mobile-optimized) |
+| Math Rendering | MathJax 3 (LaTeX for methodology formulas) |
+| Build | Node.js, Wrangler, Sharp (favicon conversion) |
 
-Before deploying, always test locally using `npm run dev`. This:
-- Builds the project
-- Starts a local Cloudflare Worker
-- Allows you to test all features without deploying
-- Provides hot-reloading for development
+## Project Structure
 
-### UI Development (testing/ folder)
-
-The `testing/` folder (git-ignored) is used for experimenting with new UI designs before deploying:
-
-1. **Create test files:**
-   - `testing/index.html` - Experimental HTML/CSS
-   - `testing/app.js` - Test JavaScript
-
-2. **Test locally:**
-   ```bash
-   npx serve testing/
-   ```
-
-3. **Deploy when ready:**
-   - Copy `testing/index.html` to `public/index.html`
-   - Copy `testing/app.js` to `public/app.js` (if changed)
-   - Run `npm run build && npm run deploy`
-
-4. **Revert if needed:**
-   - Simply delete the testing files
-   - The production `public/` files remain unchanged
-
-## 💾 Backup & Restore
-
-### Automated Backup
-
-The project includes an automated backup script (`backup.sh`) that:
-- Commits all changes to Git
-- Pushes to the remote repository
-- Can be scheduled with cron for automatic backups
-
-**To use the backup script:**
-```bash
-chmod +x backup.sh
-./backup.sh
+```
+jaccuweather/
+├── public/
+│   ├── index.html           # HTML structure + embedded CSS (~1350 lines)
+│   ├── app.js               # All frontend logic (~4700 lines)
+│   └── favicon.svg          # SVG favicon source
+├── src/
+│   └── index.js             # Auto-generated Cloudflare Worker (DO NOT EDIT)
+├── build.js                 # Worker generator: embeds assets, defines API proxy routes
+├── convert-favicon.js       # SVG to PNG for iOS touch icon
+├── wrangler.toml             # Worker config
+├── package.json             # Dependencies and scripts
+└── README.md
 ```
 
-**To schedule automatic backups (example - daily at 2 AM):**
+## Development
+
+### Prerequisites
+- Node.js v16+
+- npm
+- Cloudflare account (account ID: `89e61597ca1c6e00104f87633e0d5f77`)
+
+### Quick Start
+
 ```bash
-crontab -e
-# Add this line:
-0 2 * * * /path/to/Weather/backup.sh
+npm install
+npm run build          # Generates src/index.js from public/*
+npm run dev            # Build + local wrangler dev server
 ```
 
-### Manual Backup
+Default dev port is 8787. If occupied, use `npx wrangler dev --port 8793`.
 
-1. **Commit changes:**
-   ```bash
-   git add .
-   git commit -m "Your commit message"
-   ```
+### Build Commands
 
-2. **Push to remote:**
-   ```bash
-   git push origin main
-   ```
+| Command | What it does |
+|---------|-------------|
+| `npm run build` | Generates `src/index.js` from `public/*` via `build.js` |
+| `npm run dev` | Build + start local wrangler dev server |
+| `npm run deploy` | Build + deploy to Cloudflare Workers |
+| `node --check public/app.js` | Syntax check before build |
+| `node --check build.js` | Syntax check build script |
 
-### Restore from Backup
+### Deploy
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/anglim3/jaccuweather.git
-   cd jaccuweather
-   ```
+```bash
+npm run build
+CLOUDFLARE_ACCOUNT_ID=89e61597ca1c6e00104f87633e0d5f77 npx wrangler deploy
+```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+Verify: `curl -sSI https://weather.janglim.cloud | head -n5`
 
-3. **Build and deploy:**
-   ```bash
-   npm run build
-   npm run deploy
-   ```
+### Remote Preview with Worker Secrets
 
-## 🌐 Browser Support
+Local `wrangler dev` does not have remote Worker secrets (e.g., `GOOGLE_POLLEN_API_KEY`). For secrets-backed previews:
 
-- **Modern Browsers**: Chrome, Firefox, Safari, Edge (latest versions)
-- **Mobile Browsers**: iOS Safari, Chrome Mobile, Firefox Mobile
-- **Required Features**:
-  - ES6+ JavaScript support
-  - Fetch API
-  - Geolocation API (optional, falls back to default location)
-  - Local Storage API
-  - CSS Grid and Flexbox
+```bash
+npx wrangler dev --remote --ip 127.0.0.1 --port 8789
+```
 
-## 🔒 Security & Privacy
+## API Routes (Cloudflare Worker)
 
-- **No API Keys Required**: Uses free, open APIs that don't require authentication
-- **Client-Side Requests**: Weather API requests made directly from browser (uses user's IP)
-- **Local Storage Only**: Favorites stored locally, never sent to servers
-- **No Tracking**: No analytics or tracking scripts included
-- **CORS Handling**: Cloudflare Worker proxies API requests to avoid CORS issues
+| Route | Upstream | Notes |
+|-------|----------|-------|
+| `/` | (embedded HTML) | Serves index.html |
+| `/app.js` | (embedded JS) | Serves app.js |
+| `/favicon.svg` | (embedded) | 1-year cache |
+| `/apple-touch-icon.png` | (embedded base64) | 1-year cache |
+| `/api/forecast` | `api.open-meteo.com/v1/forecast` | 10-min cache, retry on 429 |
+| `/api/geocoding` | `geocoding-api.open-meteo.com/v1/search` | 1-hour cache |
+| `/api/reverse` | `api.bigdatacloud.net/data/reverse-geocode-client` | No cache |
+| `/api/air-quality` | `air-quality-api.open-meteo.com/v1/air-quality` | Pollen fallback |
+| `/api/pollen` | `pollen.googleapis.com` (primary) | Google Pollen API with `GOOGLE_POLLEN_API_KEY` secret, falls back to Tomorrow.io then Open-Meteo |
+| `/api/alerts` | `api.weather.gov/alerts` | US only, requires User-Agent header |
+| `/api/nws-points` | `api.weather.gov/points` | Forecast zone lookup |
+| `/api/nws-wms` | `opengeo.ncep.noaa.gov/geoserver/ows` | Radar WMS tiles, 5-min cache |
+| `/ventusky-proxy/*` | `www.ventusky.com` | Desktop UA, framebreaker neutralizer |
 
-## 🐛 Troubleshooting
+## Environment Variables
 
-### Build Errors
-- Ensure Node.js is v16 or higher
-- Delete `node_modules` and run `npm install` again
-- Check that all dependencies are installed
+| Secret | Required | Purpose |
+|--------|----------|---------|
+| `GOOGLE_POLLEN_API_KEY` | Optional | Enables Google Pollen API as primary pollen source. Without it, falls back to Tomorrow.io then Open-Meteo. |
 
-### Deployment Issues
-- Verify Cloudflare authentication: `npx wrangler whoami`
-- Check `wrangler.toml` configuration
-- Ensure you have a Cloudflare Workers account
+Set via: `npx wrangler secret put GOOGLE_POLLEN_API_KEY`
 
-### API Errors
-- Open-Meteo has rate limits - wait a moment and try again
-- Check browser console for specific error messages
-- Verify internet connection
+## Live URLs
 
-### Radar Not Loading
-- Check browser console for iframe errors
-- Verify Ventusky proxy is working
-- Try clearing browser cache
+- **Custom domain:** [weather.janglim.cloud](https://weather.janglim.cloud)
+- **Workers subdomain:** weather-app.jackanglim3.workers.dev
 
-## 📝 License
+## Credits
 
-MIT License - feel free to use this project for personal or commercial purposes.
+- **Weather Data:** [Open-Meteo](https://open-meteo.com/)
+- **Pollen Data:** Google Pollen API, [Open-Meteo Air Quality API](https://air-quality-api.open-meteo.com/)
+- **Weather Maps:** [Ventusky](https://www.ventusky.com/)
+- **NWS Alerts & Radar:** [National Weather Service](https://www.weather.gov/)
+- **Tide Data:** [NOAA Tides and Currents](https://tidesandcurrents.noaa.gov/)
+- **Moon Calculations:** [SunCalc.js](https://github.com/mourner/suncalc)
+- **Charts:** [ApexCharts](https://apexcharts.com/)
+- **Math Rendering:** [MathJax](https://www.mathjax.org/)
+- **Icons:** [Font Awesome](https://fontawesome.com/)
+- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+- **Reverse Geocoding:** [BigDataCloud](https://www.bigdatacloud.com/)
+- **Font:** [Geist](https://fonts.google.com/specimen/Geist)
 
-## 🙏 Credits
+## License
 
-- **Weather Data**: [Open-Meteo](https://open-meteo.com/) - Free, open-source weather API
-- **Air Quality & Pollen Data**: [Open-Meteo Air Quality API](https://air-quality-api.open-meteo.com/) - Real-time pollen and air quality data
-- **Weather Maps**: [Ventusky](https://www.ventusky.com/) - Interactive weather visualization
-- **Moon Calculations**: [SunCalc.js](https://github.com/mourner/suncalc) - Accurate astronomical calculations for moon phases and times
-- **Mathematical Rendering**: [MathJax](https://www.mathjax.org/) - LaTeX mathematical expression rendering
-- **Icons**: [Font Awesome](https://fontawesome.com/) - Icon library
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
-- **Charts**: [Chart.js](https://www.chartjs.org/) - JavaScript charting library
-- **Reverse Geocoding**: [BigDataCloud](https://www.bigdatacloud.com/) - Free reverse geocoding API
+MIT
 
-## 👤 Author
+## Author
 
-**Jack A** - Vibecoded with ❤️
-
----
-
-For issues, questions, or contributions, please open an issue on the [GitHub repository](https://github.com/anglim3/jaccuweather).
+Jack Anglim - maintained by TARS
