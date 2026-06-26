@@ -91,8 +91,6 @@ function baseChartOptions(overrides = {}) {
             theme: 'dark',
             // Mobile: tooltip follows finger during drag-scrub
             followCursor: isMobile,
-            // Mobile: pin tooltip to top so it stays visible while scrubbing
-            fixed: { enabled: isMobile, position: 'topRight', offsetX: 0, offsetY: 0 },
         },
         xaxis: {
             categories: xaxisCategories || [],
