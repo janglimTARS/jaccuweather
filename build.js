@@ -39,8 +39,8 @@ const JS_CONTENT = ${JSON.stringify(jsContent)};
 const FAVICON_CONTENT = ${JSON.stringify(faviconContent)};
 const APPLE_TOUCH_ICON_BASE64 = ${JSON.stringify(appleTouchIconBase64)};
 
-const POLLEN_CURRENT_PARAMS = 'us_aqi,pm10,pm2_5,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide,alder_pollen,birch_pollen,grass_pollen,weed_pollen,mugwort_pollen,olive_pollen,ragweed_pollen';
-const POLLEN_HOURLY_PARAMS = 'alder_pollen,birch_pollen,grass_pollen,weed_pollen,mugwort_pollen,olive_pollen,ragweed_pollen';
+const POLLEN_CURRENT_PARAMS = 'us_aqi,pm10,pm2_5,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen';
+const POLLEN_HOURLY_PARAMS = 'alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen';
 
 function jsonResponse(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -55,6 +55,12 @@ function jsonResponse(data, status = 200, extraHeaders = {}) {
 
 function hasNumericValue(value) {
   return value !== null && value !== undefined && Number.isFinite(Number(value));
+}
+
+function hasAnyUsablePollen(data) {
+  if (!data?.current) return false;
+  const pollenFields = ['alder_pollen','birch_pollen','olive_pollen','grass_pollen','weed_pollen','mugwort_pollen','ragweed_pollen'];
+  return pollenFields.some(f => hasNumericValue(data.current[f]));
 }
 
 function googleIndexToPollenValue(indexValue) {
@@ -364,7 +370,8 @@ async function handlePollenRequest(url, env) {
       if (googleResponse.ok) {
         const googleData = await googleResponse.json();
         const normalized = normalizeGooglePollen(googleData);
-        if (normalized?.current) {
+        if (normalized?.current && hasAnyUsablePollen(normalized)) {
+          // Check for missing weed/ragweed for diagnostics
           if (!hasNumericValue(normalized.current.weed_pollen) || !hasNumericValue(normalized.current.ragweed_pollen)) {
             const firstDay = Array.isArray(googleData.dailyInfo) ? googleData.dailyInfo[0] : null;
             const pollenTypeSummary = (firstDay?.pollenTypeInfo || []).map(info => ({
