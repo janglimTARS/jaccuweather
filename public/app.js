@@ -3710,8 +3710,18 @@ function initializeChartSelector(selectId) {
     const modal = select.closest('.modal');
     const chartContainers = modal.querySelectorAll('.chart-container');
 
+    // Set initial state to show temperature chart
+    select.value = 'temp';
+
+    // Replace select with clone to remove stale event listeners
+    const newSelect = select.cloneNode(true);
+    select.parentNode.replaceChild(newSelect, select);
+
+    // IMPORTANT: updateChartVisibility must reference newSelect (the live DOM element),
+    // not the original select (detached after clone). The closure captures `select`
+    // which is no longer in the DOM after replaceChild.
     function updateChartVisibility() {
-        const selectedValue = select.value;
+        const selectedValue = newSelect.value;
 
         chartContainers.forEach(container => {
             if (container.dataset.featureHidden === 'true') {
@@ -3727,13 +3737,8 @@ function initializeChartSelector(selectId) {
         });
     }
 
-    // Set initial state to show temperature chart
-    select.value = 'temp';
+    // Apply initial visibility for the cloned select
     updateChartVisibility();
-
-    // Replace select with clone to remove stale event listeners
-    const newSelect = select.cloneNode(true);
-    select.parentNode.replaceChild(newSelect, select);
     newSelect.addEventListener('change', updateChartVisibility);
 }
 
