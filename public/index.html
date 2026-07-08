@@ -1007,33 +1007,58 @@
 
         <!-- Loading State -->
         <div id="loading" class="hidden">
-            <!-- Hero card skeleton -->
-            <div class="card p-6 md:p-8 mb-6">
+            <!-- Hero card skeleton (matches: location, temp, sun arc, 3 stat groups with ~10 tiles) -->
+            <div class="card hero-card p-6 md:p-8 mb-6">
                 <div class="flex justify-between items-start mb-6">
                     <div class="space-y-3">
-                        <div class="skeleton h-8 w-48 rounded-lg"></div>
+                        <div class="skeleton h-8 w-56 rounded-lg"></div>
                         <div class="skeleton h-4 w-32 rounded-lg"></div>
                         <div class="skeleton h-3 w-24 rounded-lg"></div>
                     </div>
-                    <div class="flex items-center gap-3">
+                </div>
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="flex items-center gap-2">
                         <div class="skeleton h-16 w-16 rounded-2xl"></div>
-                        <div class="skeleton h-12 w-24 rounded-lg"></div>
+                        <div class="skeleton h-20 w-28 rounded-lg"></div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="skeleton h-5 w-32 rounded-lg"></div>
+                        <div class="skeleton h-4 w-28 rounded-lg"></div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <!-- Sun arc skeleton -->
+                <div class="skeleton h-8 w-full rounded-lg mb-4"></div>
+                <!-- Conditions group -->
+                <div class="skeleton h-4 w-24 rounded-lg mb-2"></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                     <div class="skeleton h-20 rounded-xl"></div>
                     <div class="skeleton h-20 rounded-xl"></div>
                     <div class="skeleton h-20 rounded-xl"></div>
                     <div class="skeleton h-20 rounded-xl"></div>
                 </div>
+                <!-- Atmosphere group -->
+                <div class="skeleton h-4 w-24 rounded-lg mb-2"></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="skeleton h-20 rounded-xl"></div>
+                    <div class="skeleton h-20 rounded-xl"></div>
+                    <div class="skeleton h-20 rounded-xl"></div>
+                    <div class="skeleton h-20 rounded-xl"></div>
+                </div>
+                <!-- Health group -->
+                <div class="skeleton h-4 w-24 rounded-lg mb-2"></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="skeleton h-20 rounded-xl"></div>
+                    <div class="skeleton h-20 rounded-xl"></div>
+                    <div class="skeleton h-20 rounded-xl"></div>
+                </div>
             </div>
-            <!-- Forecast skeleton -->
+            <!-- Hourly forecast skeleton (matches: header + toggle + scroll row) -->
             <div class="card p-6 md:p-8 mb-6">
                 <div class="flex justify-between items-center mb-4">
-                    <div class="skeleton h-7 w-48 rounded-lg"></div>
-                    <div class="skeleton h-8 w-32 rounded-full"></div>
+                    <div class="skeleton h-6 w-40 rounded-lg"></div>
+                    <div class="skeleton h-8 w-28 rounded-full"></div>
                 </div>
-                <div class="flex gap-3 pb-2">
+                <div class="flex gap-3 pb-2 overflow-hidden">
                     <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
                     <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
                     <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
@@ -1041,15 +1066,23 @@
                     <div class="skeleton min-w-[80px] min-h-[138px] rounded-lg"></div>
                 </div>
             </div>
-            <!-- Daily forecast skeleton -->
+            <!-- Daily forecast skeleton (matches: 14 rows) -->
             <div class="card p-6 md:p-8 mb-6">
-                <div class="skeleton h-7 w-40 rounded-lg mb-4"></div>
+                <div class="skeleton h-6 w-36 rounded-lg mb-4"></div>
                 <div class="space-y-2">
                     <div class="skeleton h-14 rounded-lg"></div>
                     <div class="skeleton h-14 rounded-lg"></div>
                     <div class="skeleton h-14 rounded-lg"></div>
                     <div class="skeleton h-14 rounded-lg"></div>
+                    <div class="skeleton h-14 rounded-lg"></div>
+                    <div class="skeleton h-14 rounded-lg"></div>
+                    <div class="skeleton h-14 rounded-lg"></div>
                 </div>
+            </div>
+            <!-- Radar skeleton -->
+            <div class="card p-6 md:p-8 mb-6">
+                <div class="skeleton h-6 w-32 rounded-lg mb-4"></div>
+                <div class="skeleton w-full rounded-xl" style="height: 400px;"></div>
             </div>
         </div>
 
@@ -1699,8 +1732,8 @@
 
     <!-- Footer -->
     <footer class="text-center mt-8 mb-4 py-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
-        <p class="text-sm" style="color: var(--text-faint);">Vibecoded with <span class="footer-heart">❤️</span> by Jack A, maintained by TARS</p>
-        <p class="text-xs mt-2" style="color: var(--text-faint); opacity: 0.7;">Weather data provided by Open-Meteo</p>
+        <p class="text-sm" style="color: var(--text-muted);">Vibecoded with <span class="footer-heart">❤️</span> by Jack A, maintained by TARS</p>
+        <p class="text-xs mt-2" style="color: var(--text-muted); opacity: 0.8;">Weather data provided by Open-Meteo</p>
         <a href="https://strike.me/anglim3" target="_blank" rel="noopener noreferrer"
            class="inline-flex items-center gap-2 mt-3 px-4 py-2 text-sm rounded-lg transition-all"
            style="color: var(--text-muted); background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(12px);">
