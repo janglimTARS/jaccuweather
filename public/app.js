@@ -1996,18 +1996,19 @@ function displayWeather(data) {
     // Pressure with trend
     displayPressure(data);
 
-    // Sunrise and sunset times (for today, index 0)
-    if (data.daily && data.daily.sunrise && data.daily.sunrise[0]) {
-        const sunriseTime = new Date(data.daily.sunrise[0]);
+    // Sunrise and sunset times (today is index 2 due to past_days=2)
+    const todayIndex = 2;
+    if (data.daily && data.daily.sunrise && data.daily.sunrise[todayIndex]) {
+        const sunriseTime = new Date(data.daily.sunrise[todayIndex]);
         document.getElementById('sunrise').textContent = formatTime12Hour(sunriseTime);
     }
-    if (data.daily && data.daily.sunset && data.daily.sunset[0]) {
-        const sunsetTime = new Date(data.daily.sunset[0]);
+    if (data.daily && data.daily.sunset && data.daily.sunset[todayIndex]) {
+        const sunsetTime = new Date(data.daily.sunset[todayIndex]);
         document.getElementById('sunset').textContent = formatTime12Hour(sunsetTime);
     }
     // Update sun arc dot position
     if (data.daily && data.daily.sunrise && data.daily.sunset) {
-        updateSunDot(data.daily.sunrise[0], data.daily.sunset[0]);
+        updateSunDot(data.daily.sunrise[todayIndex], data.daily.sunset[todayIndex]);
     }
 
     // Moon phase (for today)
