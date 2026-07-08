@@ -764,7 +764,7 @@
             }
         }
 
-        footer span {
+        footer .footer-heart {
             filter: grayscale(100%) brightness(0) invert(1) opacity(0.6);
             display: inline-block;
         }
@@ -931,16 +931,17 @@
     <div class="max-w-3xl mx-auto relative z-10" style="max-width: 920px;">
         <!-- Sticky Header -->
         <header class="sticky top-0 z-50 mb-6" style="backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(13, 33, 55, 0.4); border-radius: 999px; border: 1px solid var(--glass-border); margin: 0 -0.5rem 1.5rem; padding: 0.5rem 0.75rem;">
-            <div class="flex items-center gap-3 flex-wrap">
+            <!-- Row 1: brand + search + buttons (desktop) -->
+            <div class="flex items-center gap-3">
                 <!-- Brand -->
                 <div class="flex items-center gap-2 font-semibold flex-shrink-0" style="letter-spacing: -0.02em;">
                     <span class="text-xl" aria-hidden="true">🌤️</span>
-                    <span class="text-base">Jaccuweather</span>
+                    <span class="text-base hidden sm:inline">Jaccuweather</span>
                 </div>
 
                 <!-- Search (pill) -->
-                <div class="relative flex-1 min-w-[160px]">
-                    <div class="search-pill flex items-center gap-2 px-4 py-2">
+                <div class="relative flex-1 min-w-0">
+                    <div class="search-pill flex items-center gap-2 px-3 py-2">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.6; flex-shrink: 0;">
                             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
                         </svg>
@@ -958,7 +959,7 @@
                 </div>
 
                 <!-- Action buttons -->
-                <div class="flex items-center gap-2 flex-shrink-0">
+                <div class="flex items-center gap-1.5 flex-shrink-0">
                     <button id="searchBtn" class="btn p-2 rounded-full text-white" title="Search">
                         <i class="fas fa-search text-sm"></i>
                     </button>
@@ -969,11 +970,11 @@
                         <button id="favoritesBtn" class="btn p-2 rounded-full text-white" title="Favorites">
                             <i class="fas fa-star text-sm"></i>
                         </button>
-                        <div id="favoritesDropdown" class="hidden absolute right-0 mt-2 w-64 card rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto">
+                        <div id="favoritesDropdown" class="hidden absolute right-0 mt-2 w-64 rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto" style="background: rgba(15, 23, 42, 0.95); border: 1px solid var(--glass-border); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);">
                             <div class="p-3 border-b" style="border-color: rgba(255,255,255,0.1);">
                                 <div class="flex items-center justify-between">
                                     <h3 class="text-white font-semibold">Favorites</h3>
-                                    <button id="addFavoriteBtn" class="text-gray-400 hover:text-white text-sm">
+                                    <button id="addFavoriteBtn" class="text-sm" style="color: var(--text-muted);">
                                         <i class="fas fa-plus mr-1"></i>Add Current
                                     </button>
                                 </div>
@@ -981,7 +982,7 @@
                             <div id="favoritesList" class="p-2">
                                 <!-- Favorites will be inserted here -->
                             </div>
-                            <div id="noFavorites" class="p-4 text-gray-400 text-sm text-center hidden">
+                            <div id="noFavorites" class="p-4 text-sm text-center hidden" style="color: var(--text-muted);">
                                 No favorites yet. Add your current location to get started.
                             </div>
                         </div>
@@ -1698,7 +1699,7 @@
 
     <!-- Footer -->
     <footer class="text-center mt-8 mb-4 py-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
-        <p class="text-sm" style="color: var(--text-faint);">Vibecoded with <span style="color: var(--text-faint);">❤️</span> by Jack A, maintained by TARS</p>
+        <p class="text-sm" style="color: var(--text-faint);">Vibecoded with <span class="footer-heart">❤️</span> by Jack A, maintained by TARS</p>
         <p class="text-xs mt-2" style="color: var(--text-faint); opacity: 0.7;">Weather data provided by Open-Meteo</p>
         <a href="https://strike.me/anglim3" target="_blank" rel="noopener noreferrer"
            class="inline-flex items-center gap-2 mt-3 px-4 py-2 text-sm rounded-lg transition-all"
