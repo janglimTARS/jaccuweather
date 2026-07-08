@@ -1,4 +1,6 @@
 // ─── Dark/Light theme toggle ────────────────────────────
+// Dark mode (default) = static deep-blue background (the loading/skeleton color)
+// Light mode = weather-reactive dynamic gradients (sunny, cloudy, rainy, etc.)
 function initThemeToggle() {
     const btn = document.getElementById('themeToggleBtn');
     const icon = document.getElementById('themeIcon');
@@ -17,13 +19,21 @@ function initThemeToggle() {
     btn.addEventListener('click', () => {
         const isLight = document.documentElement.getAttribute('data-theme') === 'light';
         if (isLight) {
+            // Switch to dark: strip weather theme, back to static deep-blue
             document.documentElement.removeAttribute('data-theme');
             localStorage.setItem('jaccuweather-theme', 'dark');
             icon.className = 'fas fa-sun text-sm';
+            const bgLayer = document.getElementById('bgLayer');
+            if (bgLayer) bgLayer.className = 'bg-layer';
         } else {
+            // Switch to light: apply weather-reactive gradient
             document.documentElement.setAttribute('data-theme', 'light');
             localStorage.setItem('jaccuweather-theme', 'light');
             icon.className = 'fas fa-moon text-sm';
+            // Re-apply weather theme if we have weather data
+            if (currentWeatherData && currentWeatherData.current) {
+                setTheme(currentWeatherData.current.weather_code, currentWeatherData.current.is_day !== 0);
+            }
         }
     });
 }
@@ -1901,6 +1911,13 @@ const WMO_THEMES = {
 function setTheme(weatherCode, isDay) {
     const bgLayer = document.getElementById('bgLayer');
     if (!bgLayer) return;
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if (!isLight) {
+        // Dark mode: static deep-blue background, no weather theme
+        bgLayer.className = 'bg-layer';
+        return;
+    }
+    // Light mode: apply weather-reactive gradient
     let theme = WMO_THEMES[weatherCode] || 'cloudy';
     if (!isDay && (weatherCode === 0 || weatherCode === 1)) theme = 'clear-night';
     bgLayer.className = 'bg-layer ' + theme;

@@ -316,58 +316,9 @@
             animation: fadeUp 0.5s var(--ease);
         }
 
-        /* ─── Light mode (brighter sky backgrounds, same glass cards) ─── */
-        [data-theme="light"] .bg-layer {
-            background:
-                radial-gradient(ellipse 80% 60% at 20% 10%, rgba(125, 211, 252, 0.4), transparent 50%),
-                radial-gradient(ellipse 70% 50% at 85% 20%, rgba(251, 191, 36, 0.25), transparent 45%),
-                linear-gradient(165deg, #38bdf8 0%, #0ea5e9 55%, #0284c7 100%);
-        }
-
-        [data-theme="light"] .bg-layer.sunny {
-            background:
-                radial-gradient(ellipse 90% 70% at 70% 0%, rgba(251, 191, 36, 0.5), transparent 50%),
-                radial-gradient(ellipse 60% 40% at 10% 80%, rgba(56, 189, 248, 0.3), transparent 50%),
-                linear-gradient(160deg, #60a5fa 0%, #3b82f6 40%, #2563eb 100%);
-        }
-
-        [data-theme="light"] .bg-layer.clear-night {
-            background:
-                radial-gradient(ellipse 40% 30% at 80% 15%, rgba(255, 255, 255, 0.15), transparent 40%),
-                radial-gradient(ellipse 70% 50% at 20% 70%, rgba(99, 102, 241, 0.3), transparent 50%),
-                linear-gradient(165deg, #1e293b 0%, #334155 50%, #475569 100%);
-        }
-
-        [data-theme="light"] .bg-layer.cloudy {
-            background:
-                radial-gradient(ellipse 80% 50% at 30% 20%, rgba(148, 163, 184, 0.3), transparent 50%),
-                linear-gradient(165deg, #64748b 0%, #475569 50%, #334155 100%);
-        }
-
-        [data-theme="light"] .bg-layer.rainy {
-            background:
-                radial-gradient(ellipse 70% 50% at 50% 0%, rgba(100, 116, 139, 0.35), transparent 50%),
-                linear-gradient(165deg, #475569 0%, #334155 40%, #1e293b 100%);
-        }
-
-        [data-theme="light"] .bg-layer.storm {
-            background:
-                radial-gradient(ellipse 60% 40% at 70% 30%, rgba(139, 92, 246, 0.25), transparent 50%),
-                linear-gradient(165deg, #334155 0%, #1e293b 50%, #0f172a 100%);
-        }
-
-        [data-theme="light"] .bg-layer.snow {
-            background:
-                radial-gradient(ellipse 80% 50% at 40% 10%, rgba(226, 232, 240, 0.35), transparent 50%),
-                linear-gradient(165deg, #64748b 0%, #475569 40%, #334155 100%);
-        }
-
-        [data-theme="light"] .bg-layer.fog {
-            background:
-                radial-gradient(ellipse 100% 60% at 50% 40%, rgba(203, 213, 225, 0.3), transparent 60%),
-                linear-gradient(165deg, #64748b 0%, #475569 50%, #334155 100%);
-        }
-
+        /* ─── Light mode = weather-reactive gradients ─── */
+        /* Dark mode (default) = static deep-blue bg-layer (no theme class) */
+        /* Light mode = bg-layer gets weather theme classes (sunny, cloudy, etc.) */
         [data-theme="light"] .bg-overlay {
             opacity: 0.3;
         }
