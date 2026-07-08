@@ -1,3 +1,40 @@
+// ─── Dark/Light theme toggle ────────────────────────────
+function initThemeToggle() {
+    const btn = document.getElementById('themeToggleBtn');
+    const icon = document.getElementById('themeIcon');
+    if (!btn || !icon) return;
+
+    // Load saved theme or default to dark
+    const saved = localStorage.getItem('jaccuweather-theme');
+    if (saved === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        icon.className = 'fas fa-moon text-sm';
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        icon.className = 'fas fa-sun text-sm';
+    }
+
+    btn.addEventListener('click', () => {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        if (isLight) {
+            document.documentElement.removeAttribute('data-theme');
+            localStorage.setItem('jaccuweather-theme', 'dark');
+            icon.className = 'fas fa-sun text-sm';
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('jaccuweather-theme', 'light');
+            icon.className = 'fas fa-moon text-sm';
+        }
+    });
+}
+
+// Initialize theme toggle on DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initThemeToggle);
+} else {
+    initThemeToggle();
+}
+
 let currentLat = null;
 let currentLon = null;
 let currentLocationName = null;

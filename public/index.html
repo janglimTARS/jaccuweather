@@ -316,6 +316,152 @@
             animation: fadeUp 0.5s var(--ease);
         }
 
+        /* ─── Light mode ─────────────────────────────────────── */
+        [data-theme="light"] {
+            --glass: rgba(255, 255, 255, 0.65);
+            --glass-strong: rgba(255, 255, 255, 0.78);
+            --glass-border: rgba(0, 0, 0, 0.12);
+            --glass-highlight: rgba(255, 255, 255, 0.5);
+            --text: #1a1a2e;
+            --text-muted: rgba(26, 26, 46, 0.72);
+            --text-faint: rgba(26, 26, 46, 0.48);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            --shadow-deep: 0 20px 60px rgba(0, 0, 0, 0.12);
+            --bg-1: #c8d9e8;
+            --bg-2: #a0b8d0;
+        }
+
+        [data-theme="light"] .bg-layer {
+            background:
+                radial-gradient(ellipse 80% 60% at 20% 10%, rgba(56, 189, 248, 0.25), transparent 50%),
+                radial-gradient(ellipse 70% 50% at 85% 20%, rgba(251, 191, 36, 0.15), transparent 45%),
+                linear-gradient(165deg, #dbeafe 0%, #bfdbfe 55%, #93c5fd 100%);
+        }
+
+        [data-theme="light"] .bg-layer.sunny {
+            background:
+                radial-gradient(ellipse 90% 70% at 70% 0%, rgba(251, 191, 36, 0.35), transparent 50%),
+                radial-gradient(ellipse 60% 40% at 10% 80%, rgba(56, 189, 248, 0.2), transparent 50%),
+                linear-gradient(160deg, #93c5fd 0%, #60a5fa 40%, #3b82f6 100%);
+        }
+
+        [data-theme="light"] .bg-layer.clear-night {
+            background:
+                radial-gradient(ellipse 40% 30% at 80% 15%, rgba(255, 255, 255, 0.2), transparent 40%),
+                linear-gradient(165deg, #cbd5e1 0%, #94a3b8 50%, #64748b 100%);
+        }
+
+        [data-theme="light"] .bg-layer.cloudy {
+            background:
+                radial-gradient(ellipse 80% 50% at 30% 20%, rgba(148, 163, 184, 0.25), transparent 50%),
+                linear-gradient(165deg, #cbd5e1 0%, #94a3b8 50%, #64748b 100%);
+        }
+
+        [data-theme="light"] .bg-layer.rainy {
+            background:
+                radial-gradient(ellipse 70% 50% at 50% 0%, rgba(100, 116, 139, 0.25), transparent 50%),
+                linear-gradient(165deg, #94a3b8 0%, #64748b 40%, #475569 100%);
+        }
+
+        [data-theme="light"] .bg-layer.storm {
+            background:
+                radial-gradient(ellipse 60% 40% at 70% 30%, rgba(139, 92, 246, 0.2), transparent 50%),
+                linear-gradient(165deg, #94a3b8 0%, #64748b 50%, #334155 100%);
+        }
+
+        [data-theme="light"] .bg-layer.snow {
+            background:
+                radial-gradient(ellipse 80% 50% at 40% 10%, rgba(226, 232, 240, 0.4), transparent 50%),
+                linear-gradient(165deg, #e2e8f0 0%, #cbd5e1 40%, #94a3b8 100%);
+        }
+
+        [data-theme="light"] .bg-layer.fog {
+            background:
+                radial-gradient(ellipse 100% 60% at 50% 40%, rgba(203, 213, 225, 0.35), transparent 60%),
+                linear-gradient(165deg, #cbd5e1 0%, #94a3b8 50%, #64748b 100%);
+        }
+
+        [data-theme="light"] .bg-overlay {
+            opacity: 0.3;
+        }
+
+        [data-theme="light"] .skeleton {
+            background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 50%, rgba(0,0,0,0.06) 75%);
+        }
+
+        [data-theme="light"] .search-pill input {
+            color: var(--text);
+        }
+
+        [data-theme="light"] .search-pill input::placeholder {
+            color: var(--text-faint);
+        }
+
+        [data-theme="light"] .hero-card::after {
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.1), transparent 65%);
+        }
+
+        [data-theme="light"] .stat-card {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] .stat-card:hover {
+            background: rgba(255, 255, 255, 0.65);
+        }
+
+        [data-theme="light"] .forecast-chip {
+            background: rgba(255, 255, 255, 0.4);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        [data-theme="light"] .forecast-chip:hover {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        [data-theme="light"] .modal {
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+
+        [data-theme="light"] .modal-content {
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .clickable:hover {
+            background: rgba(255, 255, 255, 0.7) !important;
+        }
+
+        [data-theme="light"] .highlights-toggle {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .highlights-toggle-btn.active {
+            background: rgba(0, 0, 0, 0.08);
+            color: var(--text);
+        }
+
+        [data-theme="light"] .hourly-precip-bar.zero {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .daily-precip-bar {
+            background: rgba(0, 0, 0, 0.06);
+        }
+
+        [data-theme="light"] .text-white {
+            color: var(--text) !important;
+        }
+
+        [data-theme="light"] .sun-arc {
+            border-color: rgba(0, 0, 0, 0.15);
+        }
+
+        [data-theme="light"] .sun-row {
+            border-top-color: rgba(0, 0, 0, 0.1);
+        }
+
         .skeleton {
             background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 75%);
             background-size: 200% 100%;
@@ -887,6 +1033,29 @@
             font-variant-numeric: tabular-nums;
         }
 
+        /* Stat card label contrast fix - override Tailwind gray classes inside cards */
+        .card .text-gray-400,
+        .card .text-gray-500,
+        .stat-card .text-gray-400,
+        .stat-card .text-gray-500 {
+            color: var(--text-muted) !important;
+        }
+
+        .card .text-gray-300,
+        .stat-card .text-gray-300 {
+            color: var(--text) !important;
+        }
+
+        .card .text-gray-600 {
+            color: var(--text-faint) !important;
+        }
+
+        /* Health card hover - use glass hover instead of gray */
+        .stat-card.cursor-pointer:hover,
+        .stat-card\[onclick\]:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+        }
+
         /* Smooth scroll behavior */
         html {
             scroll-behavior: smooth;
@@ -904,7 +1073,7 @@
             <div class="flex items-center gap-3 flex-wrap">
                 <!-- Brand -->
                 <div class="flex items-center gap-2 font-semibold flex-shrink-0" style="letter-spacing: -0.02em;">
-                    <span style="font-size: 1.15rem; color: var(--accent);" aria-hidden="true">◎</span>
+                    <span class="text-xl" aria-hidden="true">🌤️</span>
                     <span class="text-base">Jaccuweather</span>
                 </div>
 
@@ -956,6 +1125,9 @@
                             </div>
                         </div>
                     </div>
+                    <button id="themeToggleBtn" class="btn p-2 rounded-full" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
+                        <i class="fas fa-sun text-sm" id="themeIcon"></i>
+                    </button>
                 </div>
             </div>
         </header>
@@ -1123,17 +1295,17 @@
                     <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1">
                         <span class="section-title">Health</span>
                     </div>
-                    <div id="sinusRiskSection" class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="openSymptomRiskModal('sinus')">
+                    <div id="sinusRiskSection" class="stat-card rounded-xl p-4 cursor-pointer transition-colors" onclick="openSymptomRiskModal('sinus')">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-head-side-cough text-blue-300 mr-1"></i>Sinus <i class="fas fa-info-circle text-xs ml-1"></i></div>
                         <div id="sinusRiskValue" class="text-2xl font-bold text-white"></div>
                         <div id="sinusRiskLabel" class="text-xs mt-1"></div>
                     </div>
-                    <div id="allergyRiskSection" class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="openSymptomRiskModal('allergy')">
+                    <div id="allergyRiskSection" class="stat-card rounded-xl p-4 cursor-pointer transition-colors" onclick="openSymptomRiskModal('allergy')">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-seedling text-green-300 mr-1"></i>Allergy <i class="fas fa-info-circle text-xs ml-1"></i></div>
                         <div id="allergyRiskValue" class="text-2xl font-bold text-white"></div>
                         <div id="allergyRiskLabel" class="text-xs mt-1"></div>
                     </div>
-                    <div id="niceWeatherSection" class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="openNiceWeatherModal()" role="button" tabindex="0" aria-label="Open Nice Weather methodology">
+                    <div id="niceWeatherSection" class="stat-card rounded-xl p-4 cursor-pointer transition-colors" onclick="openNiceWeatherModal()" role="button" tabindex="0" aria-label="Open Nice Weather methodology">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-face-smile-beam text-yellow-300 mr-1"></i>Nice Weather <i class="fas fa-info-circle text-xs ml-1"></i></div>
                         <div id="niceWeatherValue" class="text-2xl font-bold text-white"></div>
                         <div id="niceWeatherLabel" class="text-xs mt-1"></div>
