@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Jaccuweather">
-    <meta name="theme-color" content="#1a1a2e">
+    <meta name="theme-color" content="#0d2137">
     <meta property="og:title" content="Jaccuweather">
     <meta property="og:description" content="Real-time weather forecasts with radar, hourly and daily forecasts">
     <meta property="og:type" content="website">
@@ -31,8 +31,9 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Geist', 'system-ui', 'sans-serif'],
-                    }
+                        sans: ['DM Sans', 'system-ui', 'sans-serif'],
+                        serif: ['Instrument Serif', 'Georgia', 'serif'],
+                    },
                 }
             }
         }
@@ -44,69 +45,137 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.wms@0.2.0/dist/leaflet.wms.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap');
 
         :root {
-            --sky-ink: #060f1c;
-            --sky-deep: #0b1828;
-            --sky-mid: #102842;
-            --glass-border: rgba(148, 163, 184, 0.18);
+            /* Horizon design tokens */
+            --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+            --font-serif: 'Instrument Serif', Georgia, serif;
+            --glass: rgba(255, 255, 255, 0.12);
+            --glass-strong: rgba(255, 255, 255, 0.18);
+            --glass-border: rgba(255, 255, 255, 0.22);
             --glass-highlight: rgba(255, 255, 255, 0.08);
-            --accent: #38bdf8;
-            --accent-dim: rgba(56, 189, 248, 0.12);
-            --accent-glow: rgba(56, 189, 248, 0.25);
-            --tint-shadow: rgba(8, 47, 73, 0.45);
-            --tint-shadow-deep: rgba(4, 12, 28, 0.55);
-            --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+            --text: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.72);
+            --text-faint: rgba(255, 255, 255, 0.48);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+            --shadow-deep: 0 20px 60px rgba(0, 0, 0, 0.28);
+            --radius: 20px;
+            --radius-sm: 12px;
+            --ease: cubic-bezier(0.22, 1, 0.36, 1);
+            --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
             --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --accent: #7dd3fc;
+            --accent-bright: #38bdf8;
+            --accent-dim: rgba(125, 211, 252, 0.12);
+            --accent-glow: rgba(125, 211, 252, 0.25);
+            --sun-gold: #fbbf24;
+            --bg-1: #1a3a5c;
+            --bg-2: #0d2137;
         }
 
         html {
-            background: radial-gradient(ellipse at 20% 0%, rgba(56, 189, 248, 0.08), transparent 50%),
-                        radial-gradient(ellipse at 80% 5%, rgba(250, 204, 21, 0.04), transparent 40%),
-                        linear-gradient(165deg, var(--sky-ink) 0%, var(--sky-deep) 55%, var(--sky-mid) 100%);
-            background-attachment: fixed;
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Dynamic weather-reactive background */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 20% 10%, rgba(125, 211, 252, 0.35), transparent 50%),
+                radial-gradient(ellipse 70% 50% at 85% 20%, rgba(251, 191, 36, 0.2), transparent 45%),
+                radial-gradient(ellipse 60% 50% at 50% 90%, rgba(99, 102, 241, 0.3), transparent 50%),
+                linear-gradient(165deg, var(--bg-1) 0%, var(--bg-2) 55%, #0a1628 100%);
+            transition: background 1.2s var(--ease);
+        }
+
+        .bg-layer.sunny {
+            background:
+                radial-gradient(ellipse 90% 70% at 70% 0%, rgba(251, 191, 36, 0.45), transparent 50%),
+                radial-gradient(ellipse 60% 40% at 10% 80%, rgba(56, 189, 248, 0.25), transparent 50%),
+                linear-gradient(160deg, #3b82f6 0%, #0ea5e9 40%, #0369a1 100%);
+        }
+
+        .bg-layer.clear-night {
+            background:
+                radial-gradient(ellipse 40% 30% at 80% 15%, rgba(255, 255, 255, 0.15), transparent 40%),
+                radial-gradient(ellipse 70% 50% at 20% 70%, rgba(99, 102, 241, 0.35), transparent 50%),
+                linear-gradient(165deg, #0f172a 0%, #1e1b4b 50%, #0c0a1d 100%);
+        }
+
+        .bg-layer.cloudy {
+            background:
+                radial-gradient(ellipse 80% 50% at 30% 20%, rgba(148, 163, 184, 0.35), transparent 50%),
+                linear-gradient(165deg, #475569 0%, #334155 50%, #1e293b 100%);
+        }
+
+        .bg-layer.rainy {
+            background:
+                radial-gradient(ellipse 70% 50% at 50% 0%, rgba(100, 116, 139, 0.4), transparent 50%),
+                linear-gradient(165deg, #1e3a5f 0%, #0f2744 40%, #0c1929 100%);
+        }
+
+        .bg-layer.storm {
+            background:
+                radial-gradient(ellipse 60% 40% at 70% 30%, rgba(139, 92, 246, 0.3), transparent 50%),
+                linear-gradient(165deg, #1e1b4b 0%, #0f172a 50%, #020617 100%);
+        }
+
+        .bg-layer.snow {
+            background:
+                radial-gradient(ellipse 80% 50% at 40% 10%, rgba(226, 232, 240, 0.4), transparent 50%),
+                linear-gradient(165deg, #94a3b8 0%, #64748b 40%, #334155 100%);
+        }
+
+        .bg-layer.fog {
+            background:
+                radial-gradient(ellipse 100% 60% at 50% 40%, rgba(203, 213, 225, 0.25), transparent 60%),
+                linear-gradient(165deg, #64748b 0%, #475569 50%, #334155 100%);
+        }
+
+        .bg-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity: 0.5;
         }
 
         body {
-            font-family: 'Geist', system-ui, sans-serif;
+            font-family: var(--font-sans);
             background: transparent;
-            background-attachment: fixed;
             min-height: 100vh;
             letter-spacing: -0.015em;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
+            color: var(--text);
         }
 
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
-            background-size: 56px 56px;
-            mask-image: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent 65%);
-        }
-
+        /* Glass panels (Horizon style) */
         .card {
-            background: linear-gradient(180deg, rgba(11, 24, 40, 0.82), rgba(11, 24, 40, 0.58));
-            backdrop-filter: blur(20px) saturate(140%);
+            background: var(--glass);
+            backdrop-filter: blur(24px) saturate(1.4);
+            -webkit-backdrop-filter: blur(24px) saturate(1.4);
             border: 1px solid var(--glass-border);
-            box-shadow:
-                0 20px 50px var(--tint-shadow),
-                inset 0 1px 0 var(--glass-highlight);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
         }
 
         .hero-card {
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(56, 189, 248, 0.12);
-            background: linear-gradient(180deg, rgba(11, 24, 40, 0.88), rgba(14, 32, 54, 0.72));
-            box-shadow:
-                0 24px 60px var(--tint-shadow-deep),
-                inset 0 1px 0 var(--glass-highlight),
-                inset 0 0 0 1px rgba(56, 189, 248, 0.04);
+            background: var(--glass-strong);
+            backdrop-filter: blur(24px) saturate(1.4);
+            -webkit-backdrop-filter: blur(24px) saturate(1.4);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-deep);
         }
 
         .hero-card::after {
@@ -117,12 +186,138 @@
             right: -140px;
             top: -160px;
             border-radius: 9999px;
-            background: radial-gradient(circle, rgba(56,189,248,0.18), transparent 65%);
+            background: radial-gradient(circle, rgba(125, 211, 252, 0.15), transparent 65%);
             pointer-events: none;
         }
 
+        /* Section titles (Horizon style) */
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        /* Hero typography */
+        .location-name-serif {
+            font-family: var(--font-serif);
+            font-weight: 400;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+        }
+
+        .temp-horizon {
+            font-size: clamp(4.5rem, 12vw, 6.5rem);
+            font-weight: 300;
+            letter-spacing: -0.04em;
+            line-height: 0.9;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Sun arc */
+        .sun-row {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 1.75rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sun-arc {
+            position: relative;
+            height: 28px;
+            border-radius: 999px 999px 0 0;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-bottom: none;
+            overflow: visible;
+        }
+
+        .sun-dot {
+            position: absolute;
+            bottom: -5px;
+            left: 0%;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--sun-gold);
+            box-shadow: 0 0 12px 3px rgba(251, 191, 36, 0.55);
+            transform: translateX(-50%);
+            transition: left 0.8s var(--ease);
+        }
+
+        /* Pill search */
+        .search-pill {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 999px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: var(--shadow);
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .search-pill:focus-within {
+            background: var(--glass-strong);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .search-pill input {
+            background: transparent;
+            color: var(--text);
+            border: none;
+            outline: none;
+        }
+
+        .search-pill input::placeholder {
+            color: var(--text-faint);
+        }
+
+        /* Unit toggle pill */
+        .unit-toggle {
+            display: flex;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 999px;
+            padding: 3px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .unit-btn {
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.35rem 0.7rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.2s var(--ease);
+        }
+
+        .unit-btn.active {
+            background: rgba(255, 255, 255, 0.22);
+            color: var(--text);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Weather fade-in animation */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeUp 0.5s var(--ease);
+        }
+
         .skeleton {
-            background: linear-gradient(90deg, #1a2a3e 25%, #243650 50%, #1a2a3e 75%);
+            background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
             border-radius: 6px;
@@ -137,7 +332,7 @@
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid rgba(56, 189, 248, 0.2);
+            border: 3px solid rgba(255, 255, 255, 0.2);
             border-radius: 50%;
             border-top-color: var(--accent);
             animation: spin 0.8s var(--ease-smooth) infinite;
@@ -153,18 +348,18 @@
         }
 
         ::-webkit-scrollbar-track {
-            background: rgba(11, 24, 40, 0.4);
+            background: transparent;
             border-radius: 3px;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: rgba(56, 189, 248, 0.25);
+            background: rgba(255, 255, 255, 0.25);
             border-radius: 3px;
             transition: background 0.2s ease;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: rgba(56, 189, 248, 0.45);
+            background: rgba(255, 255, 255, 0.4);
         }
 
         .modal {
@@ -176,7 +371,7 @@
             width: 100%;
             height: 100%;
             overflow: auto;
-            background-color: rgba(4, 12, 28, 0.72);
+            background-color: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(8px);
         }
 
@@ -187,20 +382,19 @@
         }
 
         .modal-content {
-            background: linear-gradient(180deg, rgba(15, 30, 52, 0.96), rgba(11, 24, 40, 0.94));
-            backdrop-filter: blur(24px) saturate(140%);
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(24px) saturate(1.4);
+            -webkit-backdrop-filter: blur(24px) saturate(1.4);
             margin: auto;
             padding: 0;
-            border: 1px solid rgba(56, 189, 248, 0.15);
-            border-radius: 1.25rem;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
             width: 90%;
             max-width: 900px;
             max-height: 90vh;
             overflow-y: auto;
             animation: modalSlideIn 0.35s var(--ease-spring);
-            box-shadow:
-                0 30px 80px var(--tint-shadow-deep),
-                inset 0 1px 0 var(--glass-highlight);
+            box-shadow: var(--shadow-deep);
         }
 
         @keyframes modalSlideIn {
@@ -221,8 +415,8 @@
 
         .clickable:hover {
             transform: translateY(-2px) scale(1.01);
-            background: var(--accent-dim) !important;
-            box-shadow: 0 12px 30px var(--tint-shadow);
+            background: rgba(255, 255, 255, 0.16) !important;
+            box-shadow: var(--shadow);
         }
 
         .clickable:active {
@@ -230,16 +424,17 @@
         }
 
         .stat-card {
-            background: rgba(11, 24, 40, 0.42);
-            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-sm);
             transition: all 0.25s var(--ease-spring);
         }
 
         .stat-card:hover {
-            background: rgba(14, 116, 144, 0.14);
-            border-color: rgba(56, 189, 248, 0.28);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.15);
             transform: translateY(-1px);
-            box-shadow: 0 8px 20px var(--tint-shadow);
+            box-shadow: var(--shadow);
         }
 
         .stat-card:active {
@@ -247,21 +442,19 @@
         }
 
         .forecast-chip {
-            border: 1px solid rgba(148, 163, 184, 0.14);
-            background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.05);
             transition: all 0.25s var(--ease-spring);
         }
 
         .forecast-chip:hover {
-            border-color: rgba(56, 189, 248, 0.22);
-            background: linear-gradient(180deg, rgba(56, 189, 248, 0.08), rgba(56, 189, 248, 0.02));
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         /* Secondary card styling - lighter elevation than hero */
         .card:not(.hero-card) {
-            box-shadow:
-                0 12px 30px var(--tint-shadow),
-                inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            box-shadow: var(--shadow);
         }
 
         /* ── iOS 27-style Highlights Toggle ── */
@@ -271,8 +464,8 @@
             gap: 0;
             padding: 3px;
             border-radius: 9999px;
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--glass-border);
             backdrop-filter: blur(12px);
             position: relative;
         }
@@ -352,12 +545,12 @@
         .hourly-precip-bar {
             width: 6px;
             border-radius: 3px;
-            background: linear-gradient(180deg, rgba(90, 200, 250, 0.9), rgba(56, 189, 248, 0.5));
+            background: linear-gradient(180deg, rgba(125, 211, 252, 0.9), rgba(56, 189, 248, 0.5));
             transition: height 0.3s ease;
             min-height: 2px;
         }
         .hourly-precip-bar.zero {
-            background: rgba(148, 163, 184, 0.15);
+            background: rgba(255, 255, 255, 0.12);
             height: 2px;
         }
 
@@ -375,7 +568,7 @@
             flex: 1;
             min-width: 3px;
             border-radius: 2px;
-            background: rgba(148, 120, 180, 0.3);
+            background: rgba(255, 255, 255, 0.08);
             position: relative;
             overflow: hidden;
         }
@@ -385,14 +578,14 @@
             left: 0;
             right: 0;
             border-radius: 2px;
-            background: linear-gradient(180deg, rgba(90, 200, 250, 0.9), rgba(56, 189, 248, 0.6));
+            background: linear-gradient(180deg, rgba(125, 211, 252, 0.9), rgba(56, 189, 248, 0.6));
         }
 
         /* Wind direction arrow */
         .wind-arrow {
             display: inline-block;
             font-size: 1.5rem;
-            color: rgba(56, 189, 248, 0.8);
+            color: var(--accent);
             transition: transform 0.3s ease;
             line-height: 1;
         }
@@ -521,7 +714,7 @@
         .temp-display {
             font-variant-numeric: tabular-nums;
             letter-spacing: -0.04em;
-            text-shadow: 0 10px 34px rgba(56, 189, 248, 0.18);
+            text-shadow: 0 10px 34px rgba(125, 211, 252, 0.15);
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -577,10 +770,10 @@
                 left: 0;
                 right: 0;
                 height: 60px;
-                background: linear-gradient(to top, rgba(26, 26, 46, 0.95) 0%, rgba(26, 26, 46, 0) 100%);
+                background: linear-gradient(to top, rgba(13, 33, 55, 0.8) 0%, transparent 100%);
                 pointer-events: none;
                 z-index: 10;
-                border-radius: 0 0 0.75rem 0.75rem;
+                border-radius: 0 0 var(--radius-sm) var(--radius-sm);
             }
 
             .chart-container .apexcharts-canvas {
@@ -596,29 +789,29 @@
         }
 
         .search-input {
-            background: rgba(11, 24, 40, 0.68);
-            border: 1px solid rgba(148, 163, 184, 0.22);
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
             transition: all 0.25s var(--ease-spring);
         }
 
         .search-input:focus {
-            background: rgba(11, 24, 40, 0.88);
-            border-color: rgba(56, 189, 248, 0.65);
-            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12), 0 8px 20px var(--tint-shadow);
+            background: var(--glass-strong);
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.12), var(--shadow);
             outline: none;
         }
 
         .btn {
-            background: rgba(11, 24, 40, 0.64);
-            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
             transition: all 0.25s var(--ease-spring);
         }
 
         .btn:hover {
-            background: rgba(14, 116, 144, 0.24);
-            border-color: rgba(56, 189, 248, 0.4);
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.3);
             transform: translateY(-1px);
-            box-shadow: 0 6px 16px var(--tint-shadow);
+            box-shadow: var(--shadow);
         }
 
         .btn:active {
@@ -651,8 +844,8 @@
 
         /* MathJax formula containers */
         .formula-container {
-            background: rgba(11, 24, 40, 0.5);
-            border-radius: 0.5rem;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius-sm);
             padding: 1rem;
             text-align: center;
         }
@@ -677,7 +870,7 @@
 
         /* Selection color */
         ::selection {
-            background: rgba(56, 189, 248, 0.25);
+            background: rgba(125, 211, 252, 0.25);
             color: #fff;
         }
 
@@ -701,59 +894,53 @@
     </style>
 </head>
 <body class="text-white p-3 sm:p-4 md:p-8 selection:bg-sky-300/30 selection:text-white">
-    <div class="max-w-6xl mx-auto relative z-10">
-        <!-- Header -->
-        <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3" style="letter-spacing: -0.03em;">
-                <span class="text-4xl">🌤️</span>
-                Jaccuweather
-            </h1>
-            <p class="text-gray-400 text-sm font-medium tracking-wide">Powered by Open-Meteo + Ventusky</p>
+    <!-- Dynamic weather-reactive background -->
+    <div class="bg-layer" id="bgLayer" aria-hidden="true"></div>
+    <div class="bg-overlay" aria-hidden="true"></div>
 
-        </header>
-
-        <!-- Weather Alerts -->
-        <div id="weatherAlerts" class="hidden mb-6 max-w-6xl mx-auto space-y-3">
-            <!-- Alerts will be inserted here -->
-        </div>
-
-        <!-- Search Bar -->
-        <div class="mb-6 px-2">
-            <div class="flex flex-wrap gap-2 max-w-2xl mx-auto">
-                <div class="relative flex-1 min-w-[200px]">
-                    <input
-                        type="text"
-                        id="locationInput"
-                        placeholder="Search for a city or location..."
-                        autocomplete="off"
-                        class="search-input w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none"
-                    >
-                    <div id="searchAutocomplete" class="search-autocomplete hidden absolute top-full left-0 right-0 mt-2 rounded-xl border border-white/10 bg-gray-800/95 backdrop-blur-sm shadow-2xl z-[120] max-h-[300px] overflow-y-auto"></div>
+    <div class="max-w-3xl mx-auto relative z-10" style="max-width: 920px;">
+        <!-- Sticky Header -->
+        <header class="sticky top-0 z-50 mb-6" style="backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(13, 33, 55, 0.4); border-radius: 999px; border: 1px solid var(--glass-border); margin: 0 -0.5rem 1.5rem; padding: 0.5rem 0.75rem;">
+            <div class="flex items-center gap-3 flex-wrap">
+                <!-- Brand -->
+                <div class="flex items-center gap-2 font-semibold flex-shrink-0" style="letter-spacing: -0.02em;">
+                    <span style="font-size: 1.15rem; color: var(--accent);" aria-hidden="true">◎</span>
+                    <span class="text-base">Jaccuweather</span>
                 </div>
-                <div class="flex gap-2">
-                    <button
-                        id="searchBtn"
-                        class="btn px-4 md:px-6 py-3 rounded-lg text-white font-semibold"
-                    >
-                        <i class="fas fa-search"></i>
+
+                <!-- Search (pill) -->
+                <div class="relative flex-1 min-w-[160px]">
+                    <div class="search-pill flex items-center gap-2 px-4 py-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.6; flex-shrink: 0;">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                        </svg>
+                        <input
+                            type="text"
+                            id="locationInput"
+                            placeholder="Search city..."
+                            autocomplete="off"
+                            class="flex-1 min-w-0 text-sm"
+                            style="background: transparent; color: var(--text); border: none; outline: none;"
+                        >
+                        <div id="searchAutocomplete" class="search-autocomplete hidden absolute top-full left-0 right-0 mt-2 rounded-xl border bg-slate-900/92 z-[120] max-h-[300px] overflow-y-auto" style="background: rgba(15, 23, 42, 0.92); border-color: var(--glass-border); backdrop-filter: blur(24px); box-shadow: 0 16px 48px rgba(0,0,0,0.35);">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <button id="searchBtn" class="btn p-2 rounded-full text-white" title="Search">
+                        <i class="fas fa-search text-sm"></i>
                     </button>
-                    <button
-                        id="locationBtn"
-                        class="btn px-4 md:px-6 py-3 rounded-lg text-white font-semibold"
-                        title="Use current location"
-                    >
-                        <i class="fas fa-location-arrow"></i>
+                    <button id="locationBtn" class="btn p-2 rounded-full text-white" title="Use current location">
+                        <i class="fas fa-location-arrow text-sm"></i>
                     </button>
                     <div class="relative">
-                        <button
-                            id="favoritesBtn"
-                            class="btn px-4 md:px-6 py-3 rounded-lg text-white font-semibold"
-                            title="Favorites"
-                        >
-                            <i class="fas fa-star"></i>
+                        <button id="favoritesBtn" class="btn p-2 rounded-full text-white" title="Favorites">
+                            <i class="fas fa-star text-sm"></i>
                         </button>
                         <div id="favoritesDropdown" class="hidden absolute right-0 mt-2 w-64 card rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto">
-                            <div class="p-3 border-b border-gray-600/50">
+                            <div class="p-3 border-b" style="border-color: rgba(255,255,255,0.1);">
                                 <div class="flex items-center justify-between">
                                     <h3 class="text-white font-semibold">Favorites</h3>
                                     <button id="addFavoriteBtn" class="text-gray-400 hover:text-white text-sm">
@@ -771,6 +958,11 @@
                     </div>
                 </div>
             </div>
+        </header>
+
+        <!-- Weather Alerts -->
+        <div id="weatherAlerts" class="hidden mb-6 space-y-3">
+            <!-- Alerts will be inserted here -->
         </div>
 
         <!-- Error Message -->
@@ -782,7 +974,7 @@
         <!-- Loading State -->
         <div id="loading" class="hidden">
             <!-- Hero card skeleton -->
-            <div class="card rounded-3xl p-6 md:p-8 mb-6">
+            <div class="card p-6 md:p-8 mb-6">
                 <div class="flex justify-between items-start mb-6">
                     <div class="space-y-3">
                         <div class="skeleton h-8 w-48 rounded-lg"></div>
@@ -802,7 +994,7 @@
                 </div>
             </div>
             <!-- Forecast skeleton -->
-            <div class="card rounded-2xl p-6 md:p-8 mb-6">
+            <div class="card p-6 md:p-8 mb-6">
                 <div class="flex justify-between items-center mb-4">
                     <div class="skeleton h-7 w-48 rounded-lg"></div>
                     <div class="skeleton h-8 w-32 rounded-full"></div>
@@ -816,7 +1008,7 @@
                 </div>
             </div>
             <!-- Daily forecast skeleton -->
-            <div class="card rounded-2xl p-6 md:p-8 mb-6">
+            <div class="card p-6 md:p-8 mb-6">
                 <div class="skeleton h-7 w-40 rounded-lg mb-4"></div>
                 <div class="space-y-2">
                     <div class="skeleton h-14 rounded-lg"></div>
@@ -829,36 +1021,53 @@
 
         <!-- Main Content -->
         <div id="weatherContent" class="hidden">
-            <!-- Current Weather -->
-            <section class="card hero-card rounded-3xl p-6 md:p-8 mb-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+            <!-- Current Weather (Hero) -->
+            <section class="card hero-card p-6 md:p-8 mb-6 fade-in">
+                <div class="flex justify-between items-start mb-6">
                     <div>
-                        <h2 id="currentLocation" class="text-2xl md:text-3xl font-bold text-white mb-2"></h2>
-                        <p id="currentDate" class="text-gray-400"></p>
+                        <h2 id="currentLocation" class="location-name-serif text-2xl md:text-3xl text-white mb-1" style="font-family: var(--font-serif); font-weight: 400;"></h2>
+                        <p id="currentDate" class="text-sm" style="color: var(--text-muted);"></p>
                         <div class="flex items-center gap-2 mt-1">
-                            <p id="lastUpdated" class="text-gray-500 text-xs"></p>
-                            <button id="refreshBtn" class="text-gray-500 hover:text-sky-300 transition-colors" title="Refresh weather data" aria-label="Refresh weather data">
+                            <p id="lastUpdated" class="text-xs" style="color: var(--text-faint);"></p>
+                            <button id="refreshBtn" class="transition-colors" style="color: var(--text-faint);" title="Refresh weather data" aria-label="Refresh weather data">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
                             </button>
                         </div>
                     </div>
-                    <div class="text-left md:text-right mt-4 md:mt-0">
-                        <div class="flex flex-col md:flex-row md:items-end md:justify-end md:gap-3">
-                            <div class="flex items-center justify-start md:justify-end gap-3">
-                                <div id="currentIcon" class="text-5xl md:text-7xl drop-shadow-lg"></div>
-                                <div id="currentTemp" class="temp-display text-5xl md:text-7xl font-bold text-white"></div>
-                            </div>
-                            <div id="currentHighLow" class="text-sm md:text-lg text-gray-300 md:mb-2"></div>
+                </div>
+
+                <div class="flex items-center gap-4 flex-wrap">
+                    <div class="flex items-start gap-2">
+                        <div id="currentIcon" class="text-5xl md:text-6xl" style="filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));"></div>
+                        <div id="currentTemp" class="temp-horizon text-white" style="font-size: clamp(4.5rem, 12vw, 6.5rem); font-weight: 300;"></div>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <p id="currentCondition" class="text-lg" style="color: var(--text);"></p>
+                        <p id="currentHighLow" class="text-sm" style="color: var(--text-muted);"></p>
+                    </div>
+                </div>
+
+                <!-- Sun arc row -->
+                <div class="sun-row" id="sunRow">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-xs uppercase" style="letter-spacing: 0.06em; color: var(--text-faint);">Sunrise</span>
+                        <span id="sunrise" class="text-sm font-semibold" style="font-variant-numeric: tabular-nums;">--</span>
+                    </div>
+                    <div class="px-2">
+                        <div class="sun-arc">
+                            <div class="sun-dot" id="sunDot"></div>
                         </div>
-                        <p id="currentCondition" class="text-lg md:text-xl text-gray-300"></p>
+                    </div>
+                    <div class="flex flex-col gap-0.5 text-right">
+                        <span class="text-xs uppercase" style="letter-spacing: 0.06em; color: var(--text-faint);">Sunset</span>
+                        <span id="sunset" class="text-sm font-semibold" style="font-variant-numeric: tabular-nums;">--</span>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     <!-- Comfort group -->
-                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1 flex items-center gap-2">
-                        <span class="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Conditions</span>
-                        <div class="flex-1 h-px bg-white/8"></div>
+                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1">
+                        <span class="section-title">Conditions</span>
                     </div>
                     <div class="stat-card rounded-xl p-4">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-thermometer-half text-orange-400 mr-1"></i>Feels Like</div>
@@ -878,9 +1087,8 @@
                         <div id="uvIndex" class="text-xl font-bold text-white"></div>
                     </div>
                     <!-- Atmosphere group -->
-                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1 flex items-center gap-2">
-                        <span class="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Atmosphere</span>
-                        <div class="flex-1 h-px bg-white/8"></div>
+                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1">
+                        <span class="section-title">Atmosphere</span>
                     </div>
                     <div class="stat-card rounded-xl p-4">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-sun text-yellow-500 mr-1"></i>Sun</div>
@@ -912,9 +1120,8 @@
                         <div id="aqiStatus" class="text-gray-500 text-xs"></div>
                     </div>
                     <!-- Health group -->
-                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1 flex items-center gap-2">
-                        <span class="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Health</span>
-                        <div class="flex-1 h-px bg-white/8"></div>
+                    <div class="col-span-2 md:col-span-3 lg:col-span-4 mt-2 mb-1">
+                        <span class="section-title">Health</span>
                     </div>
                     <div id="sinusRiskSection" class="stat-card rounded-xl p-4 cursor-pointer hover:bg-gray-600/50 transition-colors" onclick="openSymptomRiskModal('sinus')">
                         <div class="text-gray-400 text-xs mb-1"><i class="fas fa-head-side-cough text-blue-300 mr-1"></i>Sinus <i class="fas fa-info-circle text-xs ml-1"></i></div>
@@ -936,7 +1143,7 @@
 
             <!-- Precipitation Timing -->
             <div id="precipTimingSection" class="hidden mb-6">
-                <div class="card rounded-2xl p-4 md:p-6">
+                <div class="card p-4 md:p-6">
                     <div class="flex items-center gap-3">
                         <span class="text-2xl" id="precipIcon">🌧️</span>
                         <p id="precipTiming" class="text-white font-medium"></p>
@@ -945,9 +1152,9 @@
             </div>
 
             <!-- Weekly Snow Totals -->
-            <section id="weeklySnowSection" class="hidden card rounded-2xl p-6 md:p-8 mb-6">
-                <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <span class="text-2xl">❄️</span> Weekly Snow Totals
+            <section id="weeklySnowSection" class="hidden card p-6 md:p-8 mb-6">
+                <h3 class="section-title mb-4" style="font-size: 1rem; text-transform: none; letter-spacing: -0.02em; color: var(--text); font-weight: 600;">
+                    Weekly Snow Totals
                 </h3>
                 <div id="weeklySnowContent" class="space-y-2">
                     <!-- Snow totals will be inserted here -->
@@ -955,10 +1162,10 @@
             </section>
 
             <!-- Hourly Forecast -->
-            <section class="card rounded-2xl p-6 md:p-8 mb-6">
+            <section class="card p-6 md:p-8 mb-6">
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
-                    <h3 class="text-xl font-bold text-white cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-2" id="hourlyHeader">
-                        <span class="text-2xl">⏰</span> 48-Hour Forecast <i class="fas fa-external-link-alt ml-2 text-sm text-gray-400"></i>
+                    <h3 class="section-title cursor-pointer flex items-center gap-2" id="hourlyHeader" style="font-size: 1rem; text-transform: none; letter-spacing: -0.02em; color: var(--text); font-weight: 600;">
+                        48-Hour Forecast <i class="fas fa-external-link-alt ml-2 text-sm" style="color: var(--text-faint);"></i>
                     </h3>
                     <!-- iOS 27-style highlights toggle -->
                     <div class="flex items-center">
@@ -1003,9 +1210,9 @@
             </section>
 
             <!-- Daily Forecast -->
-            <section class="card rounded-2xl p-6 md:p-8 mb-6">
-                <h3 class="text-xl font-bold text-white mb-4 cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-2" id="dailyHeader">
-                    <span class="text-2xl">📅</span> 14-Day Forecast <i class="fas fa-external-link-alt ml-2 text-sm text-gray-400"></i>
+            <section class="card p-6 md:p-8 mb-6">
+                <h3 class="section-title cursor-pointer flex items-center gap-2 mb-4" id="dailyHeader" style="font-size: 1rem; text-transform: none; letter-spacing: -0.02em; color: var(--text); font-weight: 600;">
+                    14-Day Forecast <i class="fas fa-external-link-alt ml-2 text-sm" style="color: var(--text-faint);"></i>
                 </h3>
                 <div id="dailyForecast" class="space-y-2">
                     <!-- Daily items will be inserted here -->
@@ -1013,9 +1220,9 @@
             </section>
 
             <!-- Weather Radar -->
-            <section class="card rounded-2xl p-6 md:p-8 mb-6">
-                <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <span class="text-2xl">📡</span> Weather Radar
+            <section class="card p-6 md:p-8 mb-6">
+                <h3 class="section-title mb-4" style="font-size: 1rem; text-transform: none; letter-spacing: -0.02em; color: var(--text); font-weight: 600;">
+                    Weather Radar
                 </h3>
                 <div id="radarContainer" class="relative">
                     <!-- Ventusky iframe -->
@@ -1037,9 +1244,9 @@
                 </div>
             </section>
             <!-- Pollen Forecast -->
-            <section id="pollenSection" class="hidden card rounded-2xl p-6 md:p-8 mb-6">
-                <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <span class="text-2xl">🌿</span> Pollen Forecast
+            <section id="pollenSection" class="hidden card p-6 md:p-8 mb-6">
+                <h3 class="section-title mb-4" style="font-size: 1rem; text-transform: none; letter-spacing: -0.02em; color: var(--text); font-weight: 600;">
+                    Pollen Forecast
                 </h3>
 
                 <!-- Current Pollen Levels -->
@@ -1457,11 +1664,12 @@
     <script src="app.js"></script>
 
     <!-- Footer -->
-    <footer class="text-center mt-8 mb-4 py-4 border-t border-gray-700/50">
-        <p class="text-gray-500 text-sm">Vibecoded with <span class="text-gray-500">❤️</span> by Jack A, maintained by TARS</p>
-        <p class="text-gray-600 text-xs mt-2">Weather data provided by Open-Meteo</p>
+    <footer class="text-center mt-8 mb-4 py-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
+        <p class="text-sm" style="color: var(--text-faint);">Vibecoded with <span style="color: var(--text-faint);">❤️</span> by Jack A, maintained by TARS</p>
+        <p class="text-xs mt-2" style="color: var(--text-faint); opacity: 0.7;">Weather data provided by Open-Meteo</p>
         <a href="https://strike.me/anglim3" target="_blank" rel="noopener noreferrer"
-           class="inline-flex items-center gap-2 mt-3 px-4 py-2 text-sm text-gray-400 hover:text-white bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600/50 hover:border-gray-500/50 rounded-lg transition-all">
+           class="inline-flex items-center gap-2 mt-3 px-4 py-2 text-sm rounded-lg transition-all"
+           style="color: var(--text-muted); background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(12px);">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M23.638 14.904c-1.602 6.43-8.113 10.34-14.542 8.736C2.67 22.05-1.244 15.525.362 9.105 1.962 2.67 8.475-1.243 14.9.358c6.43 1.605 10.342 8.115 8.738 14.548v-.002zm-6.35-4.613c.24-1.59-.974-2.45-2.64-3.03l.54-2.153-1.315-.33-.525 2.107c-.345-.087-.705-.167-1.064-.25l.526-2.127-1.32-.33-.54 2.165c-.285-.067-.565-.132-.84-.2l-1.815-.45-.35 1.407s.975.225.955.236c.535.136.63.486.615.766l-1.477 5.92c-.075.166-.24.406-.614.314.015.02-.96-.24-.96-.24l-.66 1.51 1.71.426.93.242-.54 2.19 1.32.327.54-2.17c.36.1.705.19 1.05.273l-.51 2.154 1.32.33.545-2.19c2.24.427 3.93.257 4.64-1.774.57-1.637-.03-2.58-1.217-3.196.854-.193 1.5-.76 1.68-1.93h.01zm-3.01 4.22c-.404 1.64-3.157.75-4.05.53l.72-2.9c.896.23 3.757.67 3.33 2.37zm.41-4.24c-.37 1.49-2.662.735-3.405.55l.654-2.64c.744.18 3.137.52 2.75 2.084v.006z"/>
             </svg>

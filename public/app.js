@@ -1846,6 +1846,43 @@ async function fetchWeather(lat, lon) {
     }
 }
 
+// ─── Horizon dynamic background theme ───────────────────
+const WMO_THEMES = {
+    0: 'sunny', 1: 'sunny',
+    2: 'cloudy', 3: 'cloudy',
+    45: 'fog', 48: 'fog',
+    51: 'rainy', 53: 'rainy', 55: 'rainy',
+    56: 'rainy', 57: 'rainy',
+    61: 'rainy', 63: 'rainy', 65: 'rainy',
+    66: 'rainy', 67: 'rainy',
+    71: 'snow', 73: 'snow', 75: 'snow', 77: 'snow',
+    80: 'rainy', 81: 'rainy', 82: 'storm',
+    85: 'snow', 86: 'snow',
+    95: 'storm', 96: 'storm', 99: 'storm',
+};
+
+function setTheme(weatherCode, isDay) {
+    const bgLayer = document.getElementById('bgLayer');
+    if (!bgLayer) return;
+    let theme = WMO_THEMES[weatherCode] || 'cloudy';
+    if (!isDay && (weatherCode === 0 || weatherCode === 1)) theme = 'clear-night';
+    bgLayer.className = 'bg-layer ' + theme;
+}
+
+// Update sun dot position based on sunrise/sunset times
+function updateSunDot(sunriseIso, sunsetIso) {
+    const sunDot = document.getElementById('sunDot');
+    if (!sunDot || !sunriseIso || !sunsetIso) return;
+    const now = Date.now();
+    const rise = new Date(sunriseIso).getTime();
+    const set = new Date(sunsetIso).getTime();
+    let pct = 0;
+    if (now <= rise) pct = 0;
+    else if (now >= set) pct = 100;
+    else pct = ((now - rise) / (set - rise)) * 100;
+    sunDot.style.left = `${pct}%`;
+}
+
 function displayWeather(data) {
     setHourlyTidesVisibility(currentTideData);
     setDailyTidesVisibility(currentTideData);
@@ -1876,6 +1913,9 @@ function displayWeather(data) {
         currentIconEl.textContent = getWeatherIcon(data.current.weather_code, data.current.is_day !== 0);
         currentIconEl.setAttribute('aria-hidden', 'true');
     }
+
+    // Set dynamic background theme based on current conditions
+    setTheme(data.current.weather_code, data.current.is_day !== 0);
 
     // Display today's high/low temperatures (index 2 because of past_days=2)
     if (data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[2] !== undefined) {
@@ -1910,6 +1950,10 @@ function displayWeather(data) {
     if (data.daily && data.daily.sunset && data.daily.sunset[0]) {
         const sunsetTime = new Date(data.daily.sunset[0]);
         document.getElementById('sunset').textContent = formatTime12Hour(sunsetTime);
+    }
+    // Update sun arc dot position
+    if (data.daily && data.daily.sunrise && data.daily.sunset) {
+        updateSunDot(data.daily.sunrise[0], data.daily.sunset[0]);
     }
 
     // Moon phase (for today)
