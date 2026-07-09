@@ -1923,25 +1923,75 @@ function setTheme(weatherCode, isDay) {
     bgLayer.className = 'bg-layer ' + theme;
 }
 
-// Update sun dot position along the semicircle arc
+// Update sun/moon marker so its center sits exactly on the sun-arc path.
+// The .sun-arc is a CSS half-ellipse (border-radius top half, height 40px, full width).
+// Linear left% + sin(bottom) was wrong: x must use cos on the same parametric angle as y.
+let _sunArcRiseIso = null;
+let _sunArcSetIso = null;
+let _sunArcTimer = null;
+
 function updateSunDot(sunriseIso, sunsetIso) {
     const sunDot = document.getElementById('sunDot');
-    if (!sunDot || !sunriseIso || !sunsetIso) return;
+    const arcEl = sunDot && sunDot.parentElement;
+    if (!sunDot || !arcEl || !sunriseIso || !sunsetIso) return;
+
+    _sunArcRiseIso = sunriseIso;
+    _sunArcSetIso = sunsetIso;
+
+    // If layout hasn't sized the arc yet, retry on next frames (avoids left stuck at 0px)
+    if (arcEl.clientWidth < 8) {
+        requestAnimationFrame(() => updateSunDot(sunriseIso, sunsetIso));
+        return;
+    }
+
     const now = Date.now();
     const rise = new Date(sunriseIso).getTime();
     const set = new Date(sunsetIso).getTime();
-    let pct = 0;
-    if (now <= rise) pct = 0;
-    else if (now >= set) pct = 100;
-    else pct = ((now - rise) / (set - rise)) * 100;
-    // Position along the arc: left moves 0% -> 100%
-    sunDot.style.left = `${pct}%`;
-    // Vertical position follows a semicircle: y = sin(angle) * radius
-    // angle goes from PI (left, 0%) to 0 (right, 100%)
-    const angle = Math.PI * (1 - pct / 100);
-    const arcHeight = 34; // matches sun-arc height minus dot radius
-    const bottomPx = Math.sin(angle) * arcHeight - 6;
-    sunDot.style.bottom = `${bottomPx}px`;
+    if (!Number.isFinite(rise) || !Number.isFinite(set) || set <= rise) return;
+
+    const isDay = now >= rise && now <= set;
+
+    // Day progress along the arc; night parks at the ends (pre-dawn left, post-dusk right)
+    let t = 0;
+    if (now <= rise) t = 0;
+    else if (now >= set) t = 1;
+    else t = (now - rise) / (set - rise);
+
+    // Parametric half-ellipse: theta from PI (sunrise/left) -> 0 (sunset/right)
+    // x = cx + a*cos(theta), y = b*sin(theta) measured from bottom of the arc box
+    const theta = Math.PI * (1 - t);
+    // Border-box size so the path tracks the visible 2px half-ellipse stroke
+    const a = arcEl.offsetWidth / 2;
+    const b = arcEl.offsetHeight;
+    const x = a + a * Math.cos(theta); // 0 .. width
+    const borderHalf = 1; // half of 2px stroke so the center sits on the line
+    const y = Math.max(0, b * Math.sin(theta) - borderHalf);
+
+    // Center the marker on the stroke (left/bottom are the box edges of the 12px dot)
+    const r = sunDot.offsetWidth ? sunDot.offsetWidth / 2 : 6;
+    sunDot.style.left = `${x}px`;
+    sunDot.style.bottom = `${y - r}px`;
+
+    // Day = sun (gold), night = moon (silver)
+    sunDot.classList.toggle('is-moon', !isDay);
+    sunDot.setAttribute('aria-label', isDay ? 'Sun position' : 'Moon (sun is down)');
+    sunDot.title = isDay ? 'Sun' : 'Moon';
+
+    // Keep the marker honest as time passes / layout resizes without a full weather refresh
+    if (!_sunArcTimer) {
+        _sunArcTimer = setInterval(() => {
+            if (_sunArcRiseIso && _sunArcSetIso) updateSunDot(_sunArcRiseIso, _sunArcSetIso);
+        }, 60_000);
+        window.addEventListener('resize', () => {
+            if (_sunArcRiseIso && _sunArcSetIso) updateSunDot(_sunArcRiseIso, _sunArcSetIso);
+        });
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(() => {
+                if (_sunArcRiseIso && _sunArcSetIso) updateSunDot(_sunArcRiseIso, _sunArcSetIso);
+            });
+            ro.observe(arcEl);
+        }
+    }
 }
 
 function displayWeather(data) {
