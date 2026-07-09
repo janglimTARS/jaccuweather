@@ -155,11 +155,6 @@
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
             color: var(--text);
-            /* iOS PWA: extend content into notch area, but keep it visible */
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
-            padding-left: env(safe-area-inset-left);
-            padding-right: env(safe-area-inset-right);
         }
 
         /* Glass panels (Horizon style) */
@@ -958,7 +953,7 @@
     <div class="bg-layer" id="bgLayer" aria-hidden="true"></div>
     <div class="bg-overlay" aria-hidden="true"></div>
 
-    <div class="max-w-3xl mx-auto relative z-10" style="max-width: 920px;">
+    <div class="max-w-3xl mx-auto relative z-10" style="max-width: 920px; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);">
         <!-- Sticky Header -->
         <header class="sticky z-50 mb-6" style="top: env(safe-area-inset-top); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(13, 33, 55, 0.4); border-radius: 999px; border: 1px solid var(--glass-border); margin: 0 -0.5rem 1.5rem; padding: 0.5rem 0.75rem;">
             <!-- Row 1: brand + search + buttons (desktop) -->
