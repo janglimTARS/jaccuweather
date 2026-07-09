@@ -8,7 +8,8 @@ A full-featured weather application deployed as a Cloudflare Worker. Vanilla Jav
 
 ### Current Conditions
 - Real-time temperature, conditions, feels-like, humidity, wind, UV index
-- Sunrise/sunset times, moon phase with clickable detail modal
+- Sunrise/sunset times with **SVG sun arc**: gold sun rides the half-ellipse path by local solar day; becomes a silver moon after dark (and parks at the ends before dawn / after dusk)
+- Moon phase with clickable detail modal
 - Pressure with trend indicator
 - Air quality index (when available)
 - Manual refresh button with spin animation
@@ -58,16 +59,59 @@ A full-featured weather application deployed as a Cloudflare Worker. Vanilla Jav
 - Reverse geocoding via BigDataCloud (cleaned of API artifacts)
 - US state abbreviation normalization
 
-## Design
+## Design (Horizon)
 
-- **Font:** Geist (self-hosted via Google Fonts)
-- **Theme:** Dark navy gradient with sky-blue accent (#38bdf8)
-- **Glassmorphism:** Backdrop-blur cards with inner border highlights and tinted shadows
-- **Skeleton loaders:** Layout-matched shimmer placeholders during data fetch
-- **Interactions:** Spring-easing transitions (cubic-bezier(0.16, 1, 0.3, 1)), active/press feedback (scale 0.98), focus-visible outlines
-- **Metric grouping:** Tiles organized into Conditions, Atmosphere, and Health categories with dividers
-- **Accessibility:** Reduced-motion support, WCAG AA contrast, keyboard focus indicators
-- **Responsive:** Mobile-first with Tailwind breakpoints, touch-action pan-y on charts for mobile scrubbing
+Visual language is the **Horizon** redesign (merged July 2026): glass over dynamic sky, serif location names, sticky pill chrome. Identity stays Jaccuweather (`🌤️` logo) — reference language for chrome only.
+
+| Token | Value |
+|-------|--------|
+| Body font | **DM Sans** (UI) |
+| Display font | **Lora** (location names / hero serif) |
+| Accent | `#7dd3fc` soft sky blue |
+| Sun gold | `#fbbf24` (day marker + UV accents) |
+| Glass | `rgba(255,255,255,0.12)` + blur 24px / saturate 1.4 |
+| Glass border | `rgba(255,255,255,0.22)` |
+| Max content width | 920px |
+| Easing | `cubic-bezier(0.22, 1, 0.36, 1)` |
+
+### Dark / light mode
+
+Header sun/moon toggle, persisted in `localStorage('jaccuweather-theme')`.
+
+| Mode | Background behavior |
+|------|---------------------|
+| **Dark (default)** | Static deep-blue loading color — **no** weather reactivity |
+| **Light** | Weather-reactive gradients via `setTheme(wmo, isDay)` on `#bgLayer` |
+
+Same glass cards and light text in both modes. The only difference is whether the background reacts to conditions.
+
+### Weather-reactive backgrounds (light mode)
+
+Full-viewport `#bgLayer` themes from WMO code + `is_day`: sunny, clear-night, cloudy, rainy, storm, snow, fog. Soft radial + linear gradients with ~1.2s crossfade and a light noise overlay.
+
+### Sun / moon arc
+
+Hero row: sunrise label | arc | sunset label.
+
+- Arc is an **SVG half-ellipse** path (not a CSS border hack)
+- Marker is a 12px HTML disc so it stays circular when the arc is wide
+- Position uses local sunrise/sunset wall-clock times + `utc_offset_seconds` (Open-Meteo `timezone=auto`), so LA/Tokyo aren’t judged in the browser’s zone
+- Day: gold sun; night: silver moon (`.sun-dot.is-moon`)
+- Recomputed after layout (post-`showContent`), on location change, resize, and once a minute
+
+### Glass UI
+
+- Backdrop-blur cards, inner highlights, tinted shadows
+- Stat tiles grouped **Conditions / Atmosphere / Health**
+- Skeleton loaders sized to match loaded layout (hero, hourly chips, daily rows, radar)
+- Favorites / autocomplete dropdowns use **opaque** slate glass (`rgba(15,23,42,0.95)`), not content-card glass
+- Tailwind gray utilities inside cards overridden to theme text tokens for contrast on translucent surfaces
+
+### Interactions & a11y
+
+- Spring-easing transitions; active press `scale(0.98)`; global `:focus-visible`
+- Reduced-motion respected; mobile chart scrubbing with `touch-action: pan-y`
+- Sticky single-row header: brand emoji + flexible search + round action buttons (no wrap on small screens)
 
 ## Tech Stack
 
@@ -90,8 +134,8 @@ A full-featured weather application deployed as a Cloudflare Worker. Vanilla Jav
 ```
 jaccuweather/
 ├── public/
-│   ├── index.html           # HTML structure + embedded CSS (~1350 lines)
-│   ├── app.js               # All frontend logic (~4700 lines)
+│   ├── index.html           # HTML structure + embedded Horizon CSS (~1750 lines)
+│   ├── app.js               # All frontend logic (~4900 lines)
 │   └── favicon.svg          # SVG favicon source
 ├── src/
 │   └── index.js             # Auto-generated Cloudflare Worker (DO NOT EDIT)
@@ -190,7 +234,7 @@ Set via: `npx wrangler secret put GOOGLE_POLLEN_API_KEY`
 - **Icons:** [Font Awesome](https://fontawesome.com/)
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/)
 - **Reverse Geocoding:** [BigDataCloud](https://www.bigdatacloud.com/)
-- **Font:** [Geist](https://fonts.google.com/specimen/Geist)
+- **Fonts:** [DM Sans](https://fonts.google.com/specimen/DM+Sans) (UI), [Lora](https://fonts.google.com/specimen/Lora) (display)
 
 ## License
 
