@@ -229,26 +229,42 @@
 
         .sun-arc {
             position: relative;
-            height: 40px;
-            border-radius: 999px 999px 0 0;
-            border: 2px solid rgba(255, 255, 255, 0.15);
-            border-bottom: none;
+            height: 48px;
             overflow: visible;
+        }
+
+        .sun-arc-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            pointer-events: none;
+        }
+
+        .sun-arc-path {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.18);
+            stroke-width: 2;
+            stroke-linecap: round;
+            vector-effect: non-scaling-stroke;
         }
 
         .sun-dot {
             position: absolute;
-            bottom: -6px;
+            top: 0;
             left: 0;
             width: 12px;
             height: 12px;
+            margin: 0;
             border-radius: 50%;
             background: var(--sun-gold);
             box-shadow: 0 0 12px 3px rgba(251, 191, 36, 0.55);
-            transform: translateX(-50%);
-            transition: left 0.8s var(--ease), bottom 0.8s var(--ease), background 0.5s var(--ease), box-shadow 0.5s var(--ease);
+            transform: translate(-50%, -50%);
+            transition: left 0.8s var(--ease), top 0.8s var(--ease), background 0.5s var(--ease), box-shadow 0.5s var(--ease);
             z-index: 2;
             pointer-events: none;
+            will-change: left, top;
         }
 
         /* Night: same marker, moon styling */
@@ -1129,7 +1145,10 @@
                         <span id="sunrise" class="text-sm font-semibold" style="font-variant-numeric: tabular-nums;">--</span>
                     </div>
                     <div class="px-2">
-                        <div class="sun-arc">
+                        <div class="sun-arc" id="sunArc">
+                            <svg class="sun-arc-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+                                <path id="sunArcPath" class="sun-arc-path" d="M 0 100 A 500 100 0 0 1 1000 100"></path>
+                            </svg>
                             <div class="sun-dot" id="sunDot"></div>
                         </div>
                     </div>

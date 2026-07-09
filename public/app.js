@@ -1924,8 +1924,8 @@ function setTheme(weatherCode, isDay) {
 }
 
 // Update sun/moon marker so its center sits exactly on the sun-arc path.
-// The .sun-arc is a CSS half-ellipse (border-radius top half, height 40px, full width).
-// Linear left% + sin(bottom) was wrong: x must use cos on the same parametric angle as y.
+// Arc is an SVG half-ellipse path; marker is HTML so it stays circular.
+// Screen-space projection pins the marker center onto the stroked path.
 let _sunArcRiseIso = null;
 let _sunArcSetIso = null;
 let _sunArcUtcOffset = 0;
@@ -1997,20 +1997,41 @@ function updateSunDot(sunriseIso, sunsetIso, utcOffsetSeconds = _sunArcUtcOffset
     else if (now >= set) t = 1;
     else t = (now - rise) / (set - rise);
 
-    // Parametric half-ellipse: theta from PI (sunrise/left) -> 0 (sunset/right)
+    // Parametric half-ellipse on the SVG path (viewBox 0 0 1000 100):
+    // theta PI (sunrise/left) -> 0 (sunset/right). Map SVG user space -> screen
+    // so the 12px HTML marker center sits exactly on the stroked path.
     const theta = Math.PI * (1 - t);
-    const a = arcEl.offsetWidth / 2;
-    const b = arcEl.offsetHeight;
-    const x = a + a * Math.cos(theta);
-    const borderHalf = 1;
-    const y = Math.max(0, b * Math.sin(theta) - borderHalf);
-    const r = sunDot.offsetWidth ? sunDot.offsetWidth / 2 : 6;
+    const pathEl = document.getElementById('sunArcPath');
+    const svgEl = pathEl && pathEl.ownerSVGElement;
+
+    let x;
+    let y;
+    if (pathEl && svgEl && typeof svgEl.createSVGPoint === 'function') {
+        const pt = svgEl.createSVGPoint();
+        pt.x = 500 + 500 * Math.cos(theta);
+        pt.y = 100 - 100 * Math.sin(theta);
+        const ctm = pathEl.getScreenCTM();
+        if (ctm) {
+            const screen = pt.matrixTransform(ctm);
+            const arcRect = arcEl.getBoundingClientRect();
+            x = screen.x - arcRect.left;
+            y = screen.y - arcRect.top;
+        }
+    }
+    // Fallback if SVG matrix unavailable (shouldn't happen in modern browsers)
+    if (x === undefined || y === undefined) {
+        const a = arcEl.offsetWidth / 2;
+        const b = arcEl.offsetHeight;
+        x = a + a * Math.cos(theta);
+        y = b - b * Math.sin(theta);
+    }
 
     // Jump immediately on location change (skip 0.8s slide from previous city)
     const prevTransition = sunDot.style.transition;
     sunDot.style.transition = 'none';
     sunDot.style.left = `${x}px`;
-    sunDot.style.bottom = `${y - r}px`;
+    sunDot.style.top = `${y}px`;
+    sunDot.style.bottom = 'auto';
     void sunDot.offsetWidth; // reflow so re-enabling transition does not interpolate
     sunDot.style.transition = prevTransition || '';
 
