@@ -1928,25 +1928,65 @@ function setTheme(weatherCode, isDay) {
 // Linear left% + sin(bottom) was wrong: x must use cos on the same parametric angle as y.
 let _sunArcRiseIso = null;
 let _sunArcSetIso = null;
+let _sunArcUtcOffset = 0;
 let _sunArcTimer = null;
+let _sunArcRaf = 0;
+let _sunArcGen = 0;
 
-function updateSunDot(sunriseIso, sunsetIso) {
+// Open-Meteo timezone=auto returns sunrise/sunset as wall-clock ISO without offset
+// ("2026-07-08T05:45"). new Date() treats that as the browser zone — wrong for other cities.
+function parseLocationLocalIso(iso, utcOffsetSeconds = 0) {
+    if (!iso) return NaN;
+    const s = String(iso);
+    if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(s)) {
+        const ms = new Date(s).getTime();
+        return Number.isFinite(ms) ? ms : NaN;
+    }
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) {
+        const ms = new Date(s).getTime();
+        return Number.isFinite(ms) ? ms : NaN;
+    }
+    const asUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    return asUtc - (Number(utcOffsetSeconds) || 0) * 1000;
+}
+
+// Format Open-Meteo local wall clock without shifting into the browser timezone
+function formatIsoLocalClock(iso) {
+    const m = String(iso || '').match(/T(\d{2}):(\d{2})/);
+    if (!m) return formatTime12Hour(new Date(iso));
+    let h = parseInt(m[1], 10);
+    const mi = m[2];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${mi} ${ampm}`;
+}
+
+function updateSunDot(sunriseIso, sunsetIso, utcOffsetSeconds = _sunArcUtcOffset) {
     const sunDot = document.getElementById('sunDot');
     const arcEl = sunDot && sunDot.parentElement;
     if (!sunDot || !arcEl || !sunriseIso || !sunsetIso) return;
 
     _sunArcRiseIso = sunriseIso;
     _sunArcSetIso = sunsetIso;
+    _sunArcUtcOffset = Number(utcOffsetSeconds) || 0;
+    const gen = ++_sunArcGen;
 
-    // If layout hasn't sized the arc yet, retry on next frames (avoids left stuck at 0px)
-    if (arcEl.clientWidth < 8) {
-        requestAnimationFrame(() => updateSunDot(sunriseIso, sunsetIso));
+    // #weatherContent is often still display:none when displayWeather first runs (zero width).
+    // Never apply coords from a collapsed arc — that freezes the marker on the previous city.
+    if (arcEl.clientWidth < 8 || arcEl.offsetWidth < 8) {
+        if (_sunArcRaf) cancelAnimationFrame(_sunArcRaf);
+        _sunArcRaf = requestAnimationFrame(() => {
+            _sunArcRaf = 0;
+            if (gen !== _sunArcGen) return;
+            updateSunDot(sunriseIso, sunsetIso, utcOffsetSeconds);
+        });
         return;
     }
 
     const now = Date.now();
-    const rise = new Date(sunriseIso).getTime();
-    const set = new Date(sunsetIso).getTime();
+    const rise = parseLocationLocalIso(sunriseIso, _sunArcUtcOffset);
+    const set = parseLocationLocalIso(sunsetIso, _sunArcUtcOffset);
     if (!Number.isFinite(rise) || !Number.isFinite(set) || set <= rise) return;
 
     const isDay = now >= rise && now <= set;
@@ -1958,36 +1998,42 @@ function updateSunDot(sunriseIso, sunsetIso) {
     else t = (now - rise) / (set - rise);
 
     // Parametric half-ellipse: theta from PI (sunrise/left) -> 0 (sunset/right)
-    // x = cx + a*cos(theta), y = b*sin(theta) measured from bottom of the arc box
     const theta = Math.PI * (1 - t);
-    // Border-box size so the path tracks the visible 2px half-ellipse stroke
     const a = arcEl.offsetWidth / 2;
     const b = arcEl.offsetHeight;
-    const x = a + a * Math.cos(theta); // 0 .. width
-    const borderHalf = 1; // half of 2px stroke so the center sits on the line
+    const x = a + a * Math.cos(theta);
+    const borderHalf = 1;
     const y = Math.max(0, b * Math.sin(theta) - borderHalf);
-
-    // Center the marker on the stroke (left/bottom are the box edges of the 12px dot)
     const r = sunDot.offsetWidth ? sunDot.offsetWidth / 2 : 6;
+
+    // Jump immediately on location change (skip 0.8s slide from previous city)
+    const prevTransition = sunDot.style.transition;
+    sunDot.style.transition = 'none';
     sunDot.style.left = `${x}px`;
     sunDot.style.bottom = `${y - r}px`;
+    void sunDot.offsetWidth; // reflow so re-enabling transition does not interpolate
+    sunDot.style.transition = prevTransition || '';
 
-    // Day = sun (gold), night = moon (silver)
     sunDot.classList.toggle('is-moon', !isDay);
     sunDot.setAttribute('aria-label', isDay ? 'Sun position' : 'Moon (sun is down)');
     sunDot.title = isDay ? 'Sun' : 'Moon';
 
-    // Keep the marker honest as time passes / layout resizes without a full weather refresh
     if (!_sunArcTimer) {
         _sunArcTimer = setInterval(() => {
-            if (_sunArcRiseIso && _sunArcSetIso) updateSunDot(_sunArcRiseIso, _sunArcSetIso);
+            if (_sunArcRiseIso && _sunArcSetIso) {
+                updateSunDot(_sunArcRiseIso, _sunArcSetIso, _sunArcUtcOffset);
+            }
         }, 60_000);
         window.addEventListener('resize', () => {
-            if (_sunArcRiseIso && _sunArcSetIso) updateSunDot(_sunArcRiseIso, _sunArcSetIso);
+            if (_sunArcRiseIso && _sunArcSetIso) {
+                updateSunDot(_sunArcRiseIso, _sunArcSetIso, _sunArcUtcOffset);
+            }
         });
         if (typeof ResizeObserver !== 'undefined') {
             const ro = new ResizeObserver(() => {
-                if (_sunArcRiseIso && _sunArcSetIso) updateSunDot(_sunArcRiseIso, _sunArcSetIso);
+                if (_sunArcRiseIso && _sunArcSetIso) {
+                    updateSunDot(_sunArcRiseIso, _sunArcSetIso, _sunArcUtcOffset);
+                }
             });
             ro.observe(arcEl);
         }
@@ -2053,19 +2099,15 @@ function displayWeather(data) {
     // Pressure with trend
     displayPressure(data);
 
-    // Sunrise and sunset times (today is index 2 due to past_days=2)
+    // Sunrise and sunset times (today is index 2 due to past_days=2).
+    // Labels use wall-clock from the ISO string (location local), not browser timezone.
+    // Dot position is applied after showContent() so the arc has real layout width.
     const todayIndex = 2;
     if (data.daily && data.daily.sunrise && data.daily.sunrise[todayIndex]) {
-        const sunriseTime = new Date(data.daily.sunrise[todayIndex]);
-        document.getElementById('sunrise').textContent = formatTime12Hour(sunriseTime);
+        document.getElementById('sunrise').textContent = formatIsoLocalClock(data.daily.sunrise[todayIndex]);
     }
     if (data.daily && data.daily.sunset && data.daily.sunset[todayIndex]) {
-        const sunsetTime = new Date(data.daily.sunset[todayIndex]);
-        document.getElementById('sunset').textContent = formatTime12Hour(sunsetTime);
-    }
-    // Update sun arc dot position
-    if (data.daily && data.daily.sunrise && data.daily.sunset) {
-        updateSunDot(data.daily.sunrise[todayIndex], data.daily.sunset[todayIndex]);
+        document.getElementById('sunset').textContent = formatIsoLocalClock(data.daily.sunset[todayIndex]);
     }
 
     // Moon phase (for today)
@@ -2358,6 +2400,18 @@ function displayWeather(data) {
     displayWeeklySnowTotals(data);
 
     showContent();
+
+    // Sun/moon marker must run AFTER content is visible — hidden nodes report width 0.
+    // Double rAF covers post-paint layout (fonts / sticky header / skeleton swap).
+    if (data.daily && data.daily.sunrise && data.daily.sunset) {
+        const todayIndex = 2;
+        const riseIso = data.daily.sunrise[todayIndex];
+        const setIso = data.daily.sunset[todayIndex];
+        const offset = data.utc_offset_seconds || 0;
+        const placeSun = () => updateSunDot(riseIso, setIso, offset);
+        placeSun();
+        requestAnimationFrame(() => requestAnimationFrame(placeSun));
+    }
 
     // Add click handlers to section headers
     if (currentWeatherData) {
