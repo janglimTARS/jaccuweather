@@ -1923,7 +1923,7 @@ function setTheme(weatherCode, isDay) {
     bgLayer.className = 'bg-layer ' + theme;
 }
 
-// Update sun dot position based on sunrise/sunset times
+// Update sun dot position along the semicircle arc
 function updateSunDot(sunriseIso, sunsetIso) {
     const sunDot = document.getElementById('sunDot');
     if (!sunDot || !sunriseIso || !sunsetIso) return;
@@ -1934,7 +1934,14 @@ function updateSunDot(sunriseIso, sunsetIso) {
     if (now <= rise) pct = 0;
     else if (now >= set) pct = 100;
     else pct = ((now - rise) / (set - rise)) * 100;
+    // Position along the arc: left moves 0% -> 100%
     sunDot.style.left = `${pct}%`;
+    // Vertical position follows a semicircle: y = sin(angle) * radius
+    // angle goes from PI (left, 0%) to 0 (right, 100%)
+    const angle = Math.PI * (1 - pct / 100);
+    const arcHeight = 34; // matches sun-arc height minus dot radius
+    const bottomPx = Math.sin(angle) * arcHeight - 6;
+    sunDot.style.bottom = `${bottomPx}px`;
 }
 
 function displayWeather(data) {
